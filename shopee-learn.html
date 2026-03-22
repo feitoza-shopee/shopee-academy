@@ -936,7 +936,7 @@ body {
     <div id="form-login">
       <div class="form-group">
         <label>CPF</label>
-        <input type="text" id="login-user" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)" />
+        <input type="text" id="login-user" placeholder="000.000.000-00" maxlength="14" />
       </div>
       <div class="form-group">
         <label>Senha</label>
@@ -987,7 +987,7 @@ body {
       </div>
       <div class="form-group">
         <label>CPF</label>
-        <input type="text" id="reg-cpf" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)" />
+        <input type="text" id="reg-cpf" placeholder="000.000.000-00" maxlength="14" />
       </div>
       <div class="form-group">
         <label>Senha</label>
@@ -1125,7 +1125,7 @@ body {
   </div>
 </div>
 
-<script defer>
+<script>
 // ============================================================
 // STATE
 // ============================================================
@@ -3683,7 +3683,7 @@ function renderAdmin() {
         <label>Anthropic API Key</label>
         <div style="position:relative">
           <input type="password" id="api-key-input" placeholder="sk-ant-..."
-            style="padding-right:48px" oninput="checkAPIKeyInput()" />
+            style="padding-right:48px" id="api-key-input-field" />
           <button onclick="toggleAPIKeyVisibility()"
             style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;"
             id="toggle-key-btn">👁️</button>
@@ -4577,6 +4577,10 @@ async function boot() {
   // Wire up login/register buttons
   document.getElementById('btn-login').addEventListener('click', handleLogin);
   document.getElementById('btn-register').addEventListener('click', handleRegister);
+  document.getElementById('login-user').addEventListener('input', function(){ maskCPF(this); });
+  document.getElementById('reg-cpf').addEventListener('input', function(){ maskCPF(this); });
+  const apiKeyField = document.getElementById('api-key-input');
+  if(apiKeyField) apiKeyField.addEventListener('input', checkAPIKeyInput);
 
   await initData();
   hideLoading();
