@@ -51,7 +51,7 @@ body {
 
 /* ===== SCREEN SYSTEM ===== */
 .screen { display:none; min-height:100vh; }
-.screen.active { display:flex; flex-direction:column; }
+.screen.active { display:flex; flex-direction:column; overflow-y:auto; }
 
 /* ===== LOGIN SCREEN ===== */
 #screen-login {
@@ -241,13 +241,18 @@ body {
 }
 
 /* ===== PAGE WRAPPER ===== */
+#page-admin {
+  min-height:calc(100vh - 160px);
+}
+
 .page-content {
   flex:1;
   padding:20px;
-  padding-bottom:80px;
+  padding-bottom:100px;
   max-width:600px;
   margin:0 auto;
   width:100%;
+  overflow-y:auto;
 }
 
 /* ===== HOME / MODULES ===== */
