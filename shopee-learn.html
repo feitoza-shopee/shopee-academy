@@ -2940,6 +2940,26 @@ function updateNavStats() {
 // LOGIN
 // ============================================================
 // CPF mask
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, '');
+  if (cpf.length !== 11) return false;
+  // Block sequences like 00000000000, 11111111111, etc.
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+  // Validate first digit
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i]) * (10 - i);
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf[9])) return false;
+  // Validate second digit
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i]) * (11 - i);
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf[10])) return false;
+  return true;
+}
+
 function maskCPF(input) {
   let v = input.value.replace(/\D/g,'');
   if(v.length > 11) v = v.slice(0,11);
@@ -2964,8 +2984,8 @@ function showForgotPassword() {
 async function verifyForgotCPF() {
   const cpf = document.getElementById('forgot-cpf').value.trim();
   const errEl = document.getElementById('forgot-error');
-  if(cpf.replace(/\D/g,'').length !== 11) {
-    errEl.textContent='CPF inválido. Digite os 11 dígitos.';
+  if(!validarCPF(cpf)) {
+    errEl.textContent='CPF inválido. Verifique os dígitos e tente novamente.';
     errEl.classList.remove('hidden'); return;
   }
   const { data: user } = await getDB().from('users').select('id').eq('id', cpf).single();
@@ -3039,8 +3059,8 @@ async function handleRegister() {
     errEl.textContent='Preencha todos os campos.';
     errEl.classList.remove('hidden'); return;
   }
-  if(cpf.replace(/\D/g,'').length !== 11) {
-    errEl.textContent='CPF inválido. Digite os 11 dígitos.';
+  if(!validarCPF(cpf)) {
+    errEl.textContent='CPF inválido. Verifique os dígitos e tente novamente.';
     errEl.classList.remove('hidden'); return;
   }
   if(pass !== pass2) {
@@ -3731,7 +3751,10 @@ function logout() {
 // ============================================================
 // ADMIN PANEL
 // ============================================================
-function renderAdmin() {
+async function renderAdmin() {
+  // Reload users fresh from Supabase
+  const { data: usersData } = await getDB().from('users').select('*');
+  (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
   const users = Object.values(state.users).filter(u=>!u.isAdmin);
   const html = `
     <h2 class="section-title" style="font-size:20px;margin-bottom:4px">⚙️ Painel Admin</h2>
@@ -4321,8 +4344,8 @@ async function createUser() {
     msgEl.innerHTML='<div class="error-msg">Preencha todos os campos.</div>';
     return;
   }
-  if(uid.replace(/\D/g,'').length !== 11) {
-    msgEl.innerHTML='<div class="error-msg">❌ CPF inválido. Digite os 11 dígitos.</div>';
+  if(!validarCPF(uid)) {
+    msgEl.innerHTML='<div class="error-msg">❌ CPF inválido. Verifique os dígitos e tente novamente.</div>';
     return;
   }
   if(state.users[uid]) {
@@ -4714,6 +4737,7 @@ window.closeQuiz = closeQuiz;
 window.checkAnswer = checkAnswer;
 window.goHome = goHome;
 window.logout = logout;
+window.renderAdmin = renderAdmin;
 window.openModule = openModule;
 window.backToHome = backToHome;
 window.startLesson = startLesson;
@@ -4736,6 +4760,7 @@ window.toggleAPIKeyVisibility = toggleAPIKeyVisibility;
 window.checkAPIKeyInput = checkAPIKeyInput;
 window.saveGeneratedLesson = saveGeneratedLesson;
 window.maskCPF = maskCPF;
+window.validarCPF = validarCPF;
 
 _ready = true;
 boot();
