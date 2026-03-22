@@ -3751,6 +3751,70 @@ function logout() {
 // ============================================================
 // ADMIN PANEL
 // ============================================================
+async function searchUser() {
+  const cpf = document.getElementById('search-cpf').value.trim();
+  const resultEl = document.getElementById('search-result');
+
+  if(!cpf) {
+    resultEl.innerHTML = '<div class="error-msg">Digite um CPF para pesquisar.</div>';
+    return;
+  }
+  if(!validarCPF(cpf)) {
+    resultEl.innerHTML = '<div class="error-msg">❌ CPF inválido. Verifique os dígitos.</div>';
+    return;
+  }
+
+  resultEl.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text2);font-weight:700;font-size:13px;">🔄 Buscando...</div>';
+
+  const { data: row } = await getDB().from('users').select('*').eq('id', cpf).single();
+
+  if(!row) {
+    resultEl.innerHTML = '<div class="error-msg">❌ Nenhum colaborador encontrado com este CPF.</div>';
+    return;
+  }
+
+  const u = rowToUser(row);
+  const totalLessons = state.modules.reduce((a,m)=>a+m.lessons.length,0);
+  const done = (u.completedLessons||[]).length;
+  const pct = totalLessons ? Math.round(done/totalLessons*100) : 0;
+  const isActiveToday = u.lastActive === today();
+
+  resultEl.innerHTML = \`
+    <div style="background:#fff;border-radius:12px;padding:14px;border:2px solid var(--shopee);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;">\${u.name.charAt(0)}</div>
+        <div style="flex:1;">
+          <div style="font-weight:900;font-size:15px;">\${u.name}</div>
+          \${u.nickname ? \`<div style="font-size:12px;color:var(--shopee);font-weight:700;">"\${u.nickname}"</div>\` : ''}
+          <div style="font-size:11px;color:var(--text2);">\${u.id} · \${u.unit} · Turno \${u.shift}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
+          <div style="font-size:15px;font-weight:900;color:var(--gold)">⭐ \${u.xp||0}</div>
+          <div style="font-size:10px;color:var(--text2);font-weight:700;">XP</div>
+        </div>
+        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
+          <div style="font-size:15px;font-weight:900;color:var(--shopee)">🔥 \${u.streak||0}</div>
+          <div style="font-size:10px;color:var(--text2);font-weight:700;">Streak</div>
+        </div>
+        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
+          <div style="font-size:15px;font-weight:900;color:var(--blue)">📚 \${done}/\${totalLessons}</div>
+          <div style="font-size:10px;color:var(--text2);font-weight:700;">Lições</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:\${isActiveToday?'var(--green)':'var(--text2)'};font-weight:700;">
+          \${isActiveToday ? '🟢 Ativo hoje' : '⚪ Último acesso: ' + u.lastActive}
+        </span>
+        <button class="btn-danger" onclick="deleteUser('\${u.id}','\${u.name}')">
+          🗑️ Excluir Conta
+        </button>
+      </div>
+    </div>
+  \`;
+}
+
 async function renderAdmin() {
   // Reload users fresh from Supabase
   const { data: usersData } = await getDB().from('users').select('*');
@@ -3862,6 +3926,22 @@ async function renderAdmin() {
     <!-- Users Management -->
     <div class="admin-card">
       <h3>👥 Gerenciar Colaboradores (${users.length})</h3>
+
+      <!-- Campo de pesquisa por CPF -->
+      <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:16px;border:2px dashed var(--border);">
+        <div style="font-weight:900;font-size:13px;margin-bottom:10px;color:var(--shopee)">🔍 Pesquisar Colaborador por CPF</div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="search-cpf" placeholder="000.000.000-00" maxlength="14"
+            oninput="maskCPF(this)"
+            style="flex:1;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:600;outline:none;"
+            onkeydown="if(event.key==='Enter') searchUser()" />
+          <button onclick="searchUser()" style="padding:12px 16px;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;cursor:pointer;">
+            Buscar
+          </button>
+        </div>
+        <div id="search-result" style="margin-top:12px;"></div>
+      </div>
+
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
         <div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center;">
           <div style="font-size:22px;font-weight:900;color:var(--shopee)">${users.length}</div>
@@ -4738,6 +4818,7 @@ window.checkAnswer = checkAnswer;
 window.goHome = goHome;
 window.logout = logout;
 window.renderAdmin = renderAdmin;
+window.searchUser = searchUser;
 window.openModule = openModule;
 window.backToHome = backToHome;
 window.startLesson = startLesson;
