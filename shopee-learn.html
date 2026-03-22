@@ -1126,16 +1126,6 @@ body {
 </div>
 
 <script>
-// Early stubs — real implementations load below
-function maskCPF(i){setTimeout(()=>maskCPF(i),50);}
-function togglePass(a,b){setTimeout(()=>togglePass(a,b),50);}
-function handleLogin(){setTimeout(handleLogin,50);}
-function handleRegister(){setTimeout(handleRegister,50);}
-function showRegister(){setTimeout(showRegister,50);}
-function showLogin(){setTimeout(showLogin,50);}
-function checkAPIKeyInput(){setTimeout(checkAPIKeyInput,50);}
-</script>
-<script>
 // ============================================================
 // STATE
 // ============================================================
@@ -4632,6 +4622,7 @@ window.checkAPIKeyInput = checkAPIKeyInput;
 window.saveGeneratedLesson = saveGeneratedLesson;
 window.maskCPF = maskCPF;
 
+_ready = true;
 boot();
 </script>
 </body>
