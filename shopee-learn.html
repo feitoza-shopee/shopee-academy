@@ -3422,7 +3422,7 @@ function nextQuestion() {
   renderQuestion();
 }
 
-function finishQuiz() {
+async function finishQuiz() {
   const q = state.quiz;
   const u = state.currentUser;
   const lesson = state.currentLesson;
@@ -3447,7 +3447,7 @@ function finishQuiz() {
     if(!u.completedLessons) u.completedLessons = [];
     u.completedLessons.push(lesson.id);
   }
-  saveUser(u);
+  saveUser(u); // fire and forget
   updateNavStats();
 
   // Show result
@@ -3462,7 +3462,7 @@ function finishQuiz() {
   if(accuracy >= 70) launchConfetti();
 }
 
-function quizFailed() {
+async function quizFailed() {
   const u = state.currentUser;
   u.lives = 0;
   await saveUser(u);
@@ -4182,7 +4182,7 @@ function deletePDF(index) {
   if(el) el.innerHTML = renderPDFLibrary();
 }
 
-function registerPDFInLibrary(file, moduleName) {
+async function registerPDFInLibrary(file, moduleName) {
   const lib = getPDFLibrary();
   const now = new Date();
   const dateStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
@@ -4197,7 +4197,7 @@ function registerPDFInLibrary(file, moduleName) {
   if(el) el.innerHTML = renderPDFLibrary();
 }
 
-function createUser() {
+async function createUser() {
   const uid = document.getElementById('new-uid').value.trim();
   const name = document.getElementById('new-name').value.trim();
   const pass = document.getElementById('new-pass').value;
