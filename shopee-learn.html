@@ -964,12 +964,57 @@ body {
         </select>
       </div>
       <button class="btn-primary" id="btn-login">🚀 Entrar</button>
+      <div style="text-align:right;margin-top:8px;margin-bottom:2px;">
+        <button type="button" onclick="showForgotPassword()" style="background:none;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;color:var(--shopee);cursor:pointer;text-decoration:underline;padding:0;">
+          🔑 Esqueceu a senha?
+        </button>
+      </div>
       <button type="button" onclick="showRegister()" style="width:100%;margin-top:10px;padding:14px;background:none;border:2.5px solid var(--shopee);border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;color:var(--shopee);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='#FFF0EE'" onmouseout="this.style.background='none'">
         ✏️ Primeiro acesso? Cadastre-se
       </button>
       <div style="text-align:center;margin-top:16px;font-size:11px;color:#1A1A1A;font-weight:700;letter-spacing:0.5px;">
         Desenvolvido por Feitoza-Soc-pe2
       </div>
+    </div>
+
+    <!-- FORGOT PASSWORD FORM -->
+    <div id="form-forgot" style="display:none">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:32px;margin-bottom:8px;">🔑</div>
+        <div style="font-weight:900;font-size:18px;color:var(--text);margin-bottom:4px;">Recuperar Senha</div>
+        <div style="font-size:13px;color:var(--text2);font-weight:600;">Digite seu CPF para verificar sua conta</div>
+      </div>
+      <div class="form-group">
+        <label>CPF</label>
+        <input type="text" id="forgot-cpf" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)" />
+      </div>
+      <div id="forgot-step2" style="display:none">
+        <div style="background:#FFF8E1;border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#7D6608;">
+          ✅ CPF encontrado! Crie uma nova senha abaixo.
+        </div>
+        <div class="form-group">
+          <label>Nova Senha</label>
+          <div style="position:relative">
+            <input type="password" id="forgot-newpass" placeholder="Digite a nova senha" style="padding-right:48px" />
+            <button type="button" onclick="togglePass('forgot-newpass','eye-forgot1')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:20px;line-height:1;" id="eye-forgot1">👁️</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Confirmar Nova Senha</label>
+          <div style="position:relative">
+            <input type="password" id="forgot-newpass2" placeholder="Repita a nova senha" style="padding-right:48px" />
+            <button type="button" onclick="togglePass('forgot-newpass2','eye-forgot2')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:20px;line-height:1;" id="eye-forgot2">👁️</button>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="resetPassword()" style="margin-bottom:10px">✅ Redefinir Senha</button>
+      </div>
+      <div id="forgot-error" class="error-msg hidden"></div>
+      <button type="button" onclick="verifyForgotCPF()" id="btn-verify-cpf" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px;box-shadow:0 6px 20px rgba(238,77,45,0.3);">
+        🔍 Verificar CPF
+      </button>
+      <button type="button" onclick="showLogin()" style="width:100%;padding:14px;background:none;border:2.5px solid var(--border);border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;color:var(--text2);cursor:pointer;">
+        ← Voltar ao Login
+      </button>
     </div>
 
     <!-- REGISTER FORM -->
@@ -2899,6 +2944,66 @@ function maskCPF(input) {
 }
 
 // Show/hide forms
+function showForgotPassword() {
+  document.getElementById('form-login').style.display='none';
+  document.getElementById('form-register').style.display='none';
+  document.getElementById('form-forgot').style.display='block';
+  document.getElementById('forgot-cpf').value='';
+  document.getElementById('forgot-step2').style.display='none';
+  document.getElementById('forgot-error').classList.add('hidden');
+  document.getElementById('btn-verify-cpf').style.display='block';
+  document.querySelector('.login-logo p').textContent='Recuperação de senha';
+}
+
+async function verifyForgotCPF() {
+  const cpf = document.getElementById('forgot-cpf').value.trim();
+  const errEl = document.getElementById('forgot-error');
+  if(cpf.replace(/\D/g,'').length !== 11) {
+    errEl.textContent='CPF inválido. Digite os 11 dígitos.';
+    errEl.classList.remove('hidden'); return;
+  }
+  const { data: user } = await getDB().from('users').select('id').eq('id', cpf).single();
+  if(!user) {
+    errEl.textContent='❌ CPF não encontrado. Verifique e tente novamente.';
+    errEl.classList.remove('hidden'); return;
+  }
+  errEl.classList.add('hidden');
+  document.getElementById('forgot-step2').style.display='block';
+  document.getElementById('btn-verify-cpf').style.display='none';
+}
+
+async function resetPassword() {
+  const cpf = document.getElementById('forgot-cpf').value.trim();
+  const newpass = document.getElementById('forgot-newpass').value;
+  const newpass2 = document.getElementById('forgot-newpass2').value;
+  const errEl = document.getElementById('forgot-error');
+
+  if(!newpass || !newpass2) {
+    errEl.textContent='Preencha os dois campos de senha.';
+    errEl.classList.remove('hidden'); return;
+  }
+  if(newpass !== newpass2) {
+    errEl.textContent='As senhas não coincidem.';
+    errEl.classList.remove('hidden'); return;
+  }
+  if(newpass.length < 4) {
+    errEl.textContent='A senha deve ter pelo menos 4 caracteres.';
+    errEl.classList.remove('hidden'); return;
+  }
+
+  const { error } = await getDB().from('users').update({ password: newpass }).eq('id', cpf);
+  if(error) {
+    errEl.textContent='❌ Erro ao redefinir senha: ' + error.message;
+    errEl.classList.remove('hidden'); return;
+  }
+
+  // Update local state too
+  if(state.users[cpf]) state.users[cpf].password = newpass;
+
+  alert('✅ Senha redefinida com sucesso! Faça login com a nova senha.');
+  showLogin();
+}
+
 function showRegister() {
   document.getElementById('form-login').style.display='none';
   document.getElementById('form-register').style.display='block';
@@ -2907,6 +3012,7 @@ function showRegister() {
 }
 function showLogin() {
   document.getElementById('form-register').style.display='none';
+  document.getElementById('form-forgot').style.display='none';
   document.getElementById('form-login').style.display='block';
   document.getElementById('login-error').classList.add('hidden');
   document.querySelector('.login-logo p').textContent='Aprenda os processos da Shopee de forma divertida';
@@ -4590,6 +4696,9 @@ async function boot() {
 // Expose all functions to global scope for onclick handlers
 window.togglePass = togglePass;
 window.showRegister = showRegister;
+window.showForgotPassword = showForgotPassword;
+window.verifyForgotCPF = verifyForgotCPF;
+window.resetPassword = resetPassword;
 window.showLogin = showLogin;
 window.handleLogin = handleLogin;
 window.handleRegister = handleRegister;
