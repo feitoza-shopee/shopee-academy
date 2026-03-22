@@ -4582,6 +4582,42 @@ async function boot() {
   hideLoading();
   showScreen('screen-login');
 }
+
+// Expose all functions to global scope for onclick handlers
+window.togglePass = togglePass;
+window.showRegister = showRegister;
+window.showLogin = showLogin;
+window.handleLogin = handleLogin;
+window.handleRegister = handleRegister;
+window.switchPage = switchPage;
+window.switchRankingTab = switchRankingTab;
+window.closeQuiz = closeQuiz;
+window.checkAnswer = checkAnswer;
+window.goHome = goHome;
+window.logout = logout;
+window.openModule = openModule;
+window.backToHome = backToHome;
+window.startLesson = startLesson;
+window.selectChoice = selectChoice;
+window.selectTF = selectTF;
+window.moveOrderItem = moveOrderItem;
+window.nextQuestion = nextQuestion;
+window.finishQuiz = finishQuiz;
+window.quizFailed = quizFailed;
+window.showLockedMsg = showLockedMsg;
+window.adminCreateModule = adminCreateModule;
+window.adminDeleteModule = adminDeleteModule;
+window.adminOpenLesson = adminOpenLesson;
+window.adminDeleteLesson = adminDeleteLesson;
+window.adminAddLesson = adminAddLesson;
+window.adminSaveQuestion = adminSaveQuestion;
+window.deleteUser = deleteUser;
+window.saveAPIKey = saveAPIKey;
+window.toggleAPIKeyVisibility = toggleAPIKeyVisibility;
+window.checkAPIKeyInput = checkAPIKeyInput;
+window.saveGeneratedLesson = saveGeneratedLesson;
+window.maskCPF = maskCPF;
+
 boot();
 </script>
 </body>
