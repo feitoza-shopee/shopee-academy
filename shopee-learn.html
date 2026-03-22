@@ -3778,41 +3778,47 @@ async function searchUser() {
   const done = (u.completedLessons||[]).length;
   const pct = totalLessons ? Math.round(done/totalLessons*100) : 0;
   const isActiveToday = u.lastActive === today();
+  const levelColor = pct===0?'#999':pct<30?'#E67E22':pct<60?'#3498DB':pct<90?'#9B59B6':'#2ECC71';
 
-  resultEl.innerHTML = \`
-    <div style="background:#fff;border-radius:12px;padding:14px;border:2px solid var(--shopee);">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;">\${u.name.charAt(0)}</div>
-        <div style="flex:1;">
-          <div style="font-weight:900;font-size:15px;">\${u.name}</div>
-          \${u.nickname ? \`<div style="font-size:12px;color:var(--shopee);font-weight:700;">"\${u.nickname}"</div>\` : ''}
-          <div style="font-size:11px;color:var(--text2);">\${u.id} · \${u.unit} · Turno \${u.shift}</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
-          <div style="font-size:15px;font-weight:900;color:var(--gold)">⭐ \${u.xp||0}</div>
-          <div style="font-size:10px;color:var(--text2);font-weight:700;">XP</div>
-        </div>
-        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
-          <div style="font-size:15px;font-weight:900;color:var(--shopee)">🔥 \${u.streak||0}</div>
-          <div style="font-size:10px;color:var(--text2);font-weight:700;">Streak</div>
-        </div>
-        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
-          <div style="font-size:15px;font-weight:900;color:var(--blue)">📚 \${done}/\${totalLessons}</div>
-          <div style="font-size:10px;color:var(--text2);font-weight:700;">Lições</div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:11px;color:\${isActiveToday?'var(--green)':'var(--text2)'};font-weight:700;">
-          \${isActiveToday ? '🟢 Ativo hoje' : '⚪ Último acesso: ' + u.lastActive}
-        </span>
-        <button class="btn-danger" onclick="deleteUser('\${u.id}','\${u.name}')">
-          🗑️ Excluir Conta
-        </button>
-      </div>
-    </div>
-  \`;
+  resultEl.innerHTML =
+    '<div style="background:#fff;border-radius:12px;padding:14px;border:2px solid var(--shopee);">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">' +
+        '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;">' + u.name.charAt(0) + '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-weight:900;font-size:15px;">' + u.name + '</div>' +
+          (u.nickname ? '<div style="font-size:12px;color:var(--shopee);font-weight:700;">"' + u.nickname + '"</div>' : '') +
+          '<div style="font-size:11px;color:var(--text2);">' + u.id + ' · ' + u.unit + ' · Turno ' + u.shift + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">' +
+        '<div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">' +
+          '<div style="font-size:15px;font-weight:900;color:var(--gold)">⭐ ' + (u.xp||0) + '</div>' +
+          '<div style="font-size:10px;color:var(--text2);font-weight:700;">XP</div>' +
+        '</div>' +
+        '<div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">' +
+          '<div style="font-size:15px;font-weight:900;color:var(--shopee)">🔥 ' + (u.streak||0) + '</div>' +
+          '<div style="font-size:10px;color:var(--text2);font-weight:700;">Streak</div>' +
+        '</div>' +
+        '<div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">' +
+          '<div style="font-size:15px;font-weight:900;color:var(--blue)">📚 ' + done + '/' + totalLessons + '</div>' +
+          '<div style="font-size:10px;color:var(--text2);font-weight:700;">Lições</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">' +
+          '<span>Progresso</span><span style="color:' + levelColor + '">' + pct + '%</span>' +
+        '</div>' +
+        '<div style="background:var(--bg);border-radius:100px;height:8px;overflow:hidden;">' +
+          '<div style="height:100%;border-radius:100px;background:' + levelColor + ';width:' + pct + '%;transition:width 0.6s;"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span style="font-size:11px;color:' + (isActiveToday?'var(--green)':'var(--text2)') + ';font-weight:700;">' +
+          (isActiveToday ? '🟢 Ativo hoje' : '⚪ Último acesso: ' + u.lastActive) +
+        '</span>' +
+        '<button class="btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + u.name.replace(/'/g,"&#39;") + '\')">🗑️ Excluir Conta</button>' +
+      '</div>' +
+    '</div>';
 }
 
 async function renderAdmin() {
