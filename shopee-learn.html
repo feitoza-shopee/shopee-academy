@@ -1268,11 +1268,350 @@ async function initData() {
   });
 
   // Modules DB — seed PDF modules if missing, preserve admin-created ones
-  const PDF_MODULES_VERSION = 'v5';
+  const PDF_MODULES_VERSION = 'v6';
   const seededVersion = localStorage.getItem('sa_modules_version');
   const needsReseed = seededVersion !== PDF_MODULES_VERSION;
 
   const pdfModules = [
+      {
+        id:'mod_onboarding',
+        title:'Onboarding',
+        description:'Treinamento completo de integração: Expedição, Recebimento, Processamento e HSE. Baseado no material oficial SPX Express.',
+        icon:'🎓',
+        color:'linear-gradient(135deg,#EE4D2D,#F39C12)',
+        lessons:[
+          {
+            id:'mod_onboarding_l1',
+            title:'Expedição & Recebimento — Processos e Segurança',
+            description:'WorkStation, Stage Out, YMS, Checklist LH, Recebimento de Line Haul e First Mile',
+            xpReward:100,
+            questions:[
+              {
+                type:'multiple',
+                q:'Na Expedição, como deve ser feito o check-in na WorkStation (WS)?',
+                options:[
+                  'Apenas o líder realiza o check-in por todos',
+                  'Cada auxiliar usa qualquer WS disponível na unidade',
+                  'Todos os auxiliares que atuam na mesma doca devem fazer check-in na mesma WS, usando o QR Code da WS e o OpsID',
+                  'O check-in é opcional e pode ser feito ao final do turno'
+                ],
+                answer:2,
+                explanation:'Conforme o treinamento de Expedição: todos os auxiliares alocados na mesma doca devem fazer check-in na mesma WS, usando o QR Code da WS e o OpsID.'
+              },
+              {
+                type:'truefalse',
+                q:'O check-out automático na WorkStation para um auxiliar Online (com PDA) ocorre após 20 minutos de inatividade.',
+                answer:true,
+                explanation:'Correto. Conforme o treinamento: para auxiliares Online (com PDA), o sistema realiza o check-out automático após 20 minutos de inatividade. Para offline, são 8 horas.'
+              },
+              {
+                type:'multiple',
+                q:'O que é o Stage Out no contexto da Expedição do SOC?',
+                options:[
+                  'Uma área de armazenamento de insumos e embalagens',
+                  'O módulo no SPX referente às ruas de expedição, que permite controles de FIFO, carregamento e ocupação',
+                  'O processo de descarregamento de veículos na doca',
+                  'Um relatório de performance da expedição'
+                ],
+                answer:1,
+                explanation:'Stage Out é o módulo no SPX referente às ruas de expedição, que possibilita controles de FIFO, carregamento e ocupação da Expedição do SoC.'
+              },
+              {
+                type:'multiple',
+                q:'Na Validação do Unitizador, qual das situações a seguir NÃO gera retrabalho?',
+                options:[
+                  'TO sem possibilidade de bipe do PDA',
+                  'Pallet com 5 voltas de stretch em cada nível da carga',
+                  'Scuttle com menos de 3 voltas de stretch em cada nível',
+                  'Gaiola com sacas de fanouts diferentes'
+                ],
+                answer:1,
+                explanation:'Pallet com 5 voltas de stretch em cada nível está em conformidade — o mínimo exigido são 4 voltas. As demais opções constam na lista de irregularidades que geram retrabalho.'
+              },
+              {
+                type:'truefalse',
+                q:'Na alocação seguindo FIFO, o lado de 1,20m do palete ou gaiola deve estar sempre virado para a doca.',
+                answer:true,
+                explanation:'Correto. Para alocação conforme o FIFO, o lado de 1,20m deve estar voltado para a doca, com ocupação física de 1,20m de largura x 1,00m de comprimento.'
+              },
+              {
+                type:'multiple',
+                q:'Qual é o papel do Checklist Linehaul na Expedição?',
+                options:[
+                  'Registrar a produtividade de cada auxiliar durante o carregamento',
+                  'Validar itens obrigatórios do veículo, classificando-os como conforme ou não conforme, garantindo eficiência e segurança',
+                  'Controlar o estoque de insumos da expedição',
+                  'Verificar a qualidade das embalagens dos pacotes antes do carregamento'
+                ],
+                answer:1,
+                explanation:'O Checklist Linehaul valida itens obrigatórios do veículo, garantindo eficiência, conformidade, segurança e padronização operacional antes da liberação do veículo.'
+              },
+              {
+                type:'multiple',
+                q:'Quem deve preencher o Checklist LH antes de iniciar o carregamento de TODOS os veículos?',
+                options:[
+                  'O Fiscal de Pátio, de forma amostral',
+                  'O Motorista do veículo',
+                  'O Auxiliar de Expedição, para todos os veículos antes de iniciar o carregamento',
+                  'O Líder de Expedição, apenas nos veículos prioritários'
+                ],
+                answer:2,
+                explanation:'O Auxiliar de Expedição deve preencher o checklist para TODOS os veículos antes de iniciar o carregamento. O Fiscal de Pátio faz de forma amostral.'
+              },
+              {
+                type:'truefalse',
+                q:'Se a Pergunta 02 do Checklist LH (baú possui avaria) estiver Não Conforme, o carregamento não deverá ser realizado e um novo veículo deve ser solicitado.',
+                answer:true,
+                explanation:'Correto. Se o baú tiver furos, buracos ou emendas que possam causar avaria ou entrada de pragas, o carregamento não deve ser realizado e o líder deve ser informado para solicitar novo veículo ao time de Field.'
+              },
+              {
+                type:'multiple',
+                q:'Como ocorre a chegada do motorista ao SOC nos sistemas que utilizam YMS?',
+                options:[
+                  'O motorista liga para o Fiscal de Pátio ao chegar no estacionamento',
+                  'Automaticamente por geolocalização — ao entrar no raio do SOC, o motorista recebe notificação no app e confirma entrada na fila',
+                  'O motorista se apresenta na portaria e recebe uma senha para aguardar na fila',
+                  'O Fiscal de Pátio registra manualmente a chegada ao visualizar o veículo'
+                ],
+                answer:1,
+                explanation:'O processo de chegada ocorre automaticamente por geolocalização. Ao entrar no raio do SOC, o motorista recebe notificação no app Driver e confirma sua entrada na fila.'
+              },
+              {
+                type:'multiple',
+                q:'Quais são os dois requisitos obrigatórios de segurança antes de iniciar o processo sistêmico com o motorista?',
+                options:[
+                  'Crachá de identificação e documento do veículo',
+                  'Bota de segurança e colete refletivo',
+                  'Luva de proteção e capacete',
+                  'Uniforme completo e boné da empresa'
+                ],
+                answer:1,
+                explanation:'Antes de iniciar o processo sistêmico, é obrigatório verificar se o motorista está usando bota de segurança e colete refletivo. Caso não esteja, acionar o Líder de Expedição ou Field local.'
+              }
+            ]
+          },
+          {
+            id:'mod_onboarding_l2',
+            title:'Processamento — Sorting, Packing e Erros',
+            description:'Unitizadores, esteiras, indução, sorting, packing, tratamento de erros e status finalizadores',
+            xpReward:100,
+            questions:[
+              {
+                type:'multiple',
+                q:'Qual é a senha padrão de primeiro acesso ao PDA para um colaborador com CPF XXX.XXX.X45-67 e OpsID Ops112233?',
+                options:[
+                  '112233',
+                  '45671122',
+                  '4567112233',
+                  '112234567'
+                ],
+                answer:2,
+                explanation:'A senha padrão de primeiro acesso é: 4 últimos dígitos do CPF + número do OpsID. CPF termina em 45-67 → 4567; OpsID 112233 → senha: 4567112233.'
+              },
+              {
+                type:'truefalse',
+                q:'Na Esteira Perfil P, pacotes com produtos líquidos ou pastosos podem ser induzidos normalmente, desde que estejam bem embalados.',
+                answer:false,
+                explanation:'Não. Na Esteira Perfil P é expressamente proibida a indução de produtos líquidos ou pastosos, independentemente da embalagem.'
+              },
+              {
+                type:'multiple',
+                q:'Qual é o limite de peso para pacotes na Esteira Perfil P?',
+                options:[
+                  '8 kg',
+                  '12 kg',
+                  '20 kg',
+                  '31 kg'
+                ],
+                answer:1,
+                explanation:'A Esteira Perfil P aceita pacotes com menor lado de até 80 cm e limite de peso de 12 kg. Produtos líquidos ou pastosos são proibidos.'
+              },
+              {
+                type:'multiple',
+                q:'Qual é o posicionamento correto dos auxiliares durante a indução nas esteiras?',
+                options:[
+                  'Voltados no mesmo sentido do fluxo da esteira, para ver os pacotes chegando',
+                  'De lado à esteira, perpendicular ao fluxo',
+                  'Voltados no sentido contrário ao fluxo da esteira, com a porta do unitizador voltada para o auxiliar',
+                  'Atrás da esteira, de costas para ela'
+                ],
+                answer:2,
+                explanation:'Os auxiliares devem se posicionar voltados no sentido contrário ao fluxo da esteira. A porta do unitizador/gaiola deve estar voltada para o auxiliar, facilitando acesso e manuseio.'
+              },
+              {
+                type:'truefalse',
+                q:'As TOs devem ser fechadas durante as pausas para refeição, trocas de turno ou outras interrupções do processo.',
+                answer:false,
+                explanation:'Não. TOs NÃO devem ser fechadas em pausas para refeição, trocas de turno, banheiro, água ou qualquer outro motivo. Só devem ser fechadas quando o unitizador estiver com capacidade completa ou não houver processamento no turno seguinte.'
+              },
+              {
+                type:'multiple',
+                q:'O que é Missorting no processo de Packing?',
+                options:[
+                  'Quando o auxiliar bipou dois pacotes de uma vez na mesma TO',
+                  'Todo pacote que for sorteado para o destino X e bipado na TO com destino Y',
+                  'Quando a TO é fechada antes de estar completamente cheia',
+                  'Quando um pacote com avaria é colocado no unitizador incorreto'
+                ],
+                answer:1,
+                explanation:'Missorting é todo pacote que for sorteado para o destino X e bipado na TO com destino Y. Ao surgir a mensagem de erro (tela vermelha), clicar em confirmar, realizar o Cross-Check e devolver o pacote à esteira.'
+              },
+              {
+                type:'multiple',
+                q:'Ao surgir no PDA a mensagem de erro de Status Finalizador (Cancelled, Delivered, Returns, Damaged etc.), o que deve ser feito com o pacote?',
+                options:[
+                  'Continuar o processo normalmente, pois é um erro do sistema',
+                  'Devolver o pacote para a esteira para reprocessamento',
+                  'Confirmar o erro no PDA, realizar o Cross-Check e alocar o pacote na gaiola de Tratativas (EHA)',
+                  'Separar o pacote e informar o líder no final do turno'
+                ],
+                answer:2,
+                explanation:'Ao surgir erro de Status Finalizador, o auxiliar deve confirmar o erro no PDA, realizar o Cross-Check e alocar o pacote na gaiola identificada para Tratativas (EHA).'
+              },
+              {
+                type:'truefalse',
+                q:'O processo de Packing permite bipar mais de um pacote da bancada de uma vez para agilizar o abastecimento do unitizador.',
+                answer:false,
+                explanation:'Não. O packing deve ser realizado pacote por pacote. É proibido bipar mais de um pacote da bancada para alocar no unitizador.'
+              },
+              {
+                type:'multiple',
+                q:'O que indica uma TO Lilás (roxa) em um unitizador?',
+                options:[
+                  'Que o unitizador contém pacotes de Fulfillment com prioridade de processamento',
+                  'Que o unitizador é destinado ao fluxo de devolução (Returns)',
+                  'Que os pacotes unitizados são do perfil volumoso (pacotes maiores e mais pesados)',
+                  'Que o unitizador é de Transbordo (Cross Dock) e deve ir para a expedição imediatamente'
+                ],
+                answer:2,
+                explanation:'A TO Lilás (roxa) indica unitizadores de perfil volumoso — pacotes maiores e mais pesados. Serve como identificação visual para triagem após o recebimento e no processamento.'
+              },
+              {
+                type:'order',
+                q:'Ordene o processo correto do Packing no PDA:',
+                steps:[
+                  'Bipar os pacotes um a um',
+                  'Bipar a TO do unitizador',
+                  'Escolher o tipo de unitizador (TO Type)',
+                  'Finalizar e fechar o unitizador quando atingir capacidade'
+                ],
+                correctOrder:[1,2,0,3],
+                explanation:'Processo correto no PDA: Bipar a TO → Escolher o Unitizador (TO Type) → Bipar os pacotes um a um → Fechar quando atingir capacidade completa.'
+              }
+            ]
+          },
+          {
+            id:'mod_onboarding_l3',
+            title:'HSE — Saúde, Segurança e Meio Ambiente',
+            description:'7 Regras de Ouro, EPIs, acidentes de trabalho, ergonomia, emergências e equipamentos',
+            xpReward:100,
+            questions:[
+              {
+                type:'multiple',
+                q:'Qual das opções corresponde a uma das 7 Regras de Ouro do HSE da SPX?',
+                options:[
+                  'Eu posso orientar o motorista durante a manobra de veículos na doca se necessário',
+                  'Eu nunca me posiciono na área da doca durante a manobra de veículos',
+                  'Eu só uso EPI quando o líder solicitar explicitamente',
+                  'Eu posso operar máquinas sem treinamento em situações de urgência'
+                ],
+                answer:1,
+                explanation:'Regra de Ouro nº 4: "Eu nunca me posiciono na área da doca durante a manobra de veículos." É uma das 7 regras inegociáveis de segurança da SPX.'
+              },
+              {
+                type:'truefalse',
+                q:'Os membros da CIPA são identificados por coletes ou braçadeiras vermelhas.',
+                answer:true,
+                explanation:'Correto. Os membros da CIPA (Comissão Interna de Prevenção de Acidentes e Assédio) são identificados por coletes ou braçadeiras vermelhas. Já a Brigada de Emergência usa coletes verdes.'
+              },
+              {
+                type:'multiple',
+                q:'O que é um Acidente de Trajeto?',
+                options:[
+                  'Um acidente que ocorre durante o desenvolvimento do trabalho, dentro da empresa',
+                  'Uma doença causada pelo tipo de trabalho ou pelas condições do ambiente',
+                  'Um acidente que ocorre no trajeto entre a residência e o trabalho, ou vice-versa',
+                  'Um acidente causado por equipamento com defeito dentro da empresa'
+                ],
+                answer:2,
+                explanation:'Acidente de Trajeto é aquele que ocorre no percurso entre a residência e o local de trabalho, ou vice-versa. Exemplos: acidente de trânsito, queda de moto, atropelamento.'
+              },
+              {
+                type:'truefalse',
+                q:'A empresa tem até 1 dia útil para comunicar ao INSS um acidente de trabalho.',
+                answer:true,
+                explanation:'Correto. A empresa possui 1 dia útil para comunicar ao INSS o acidente de trabalho, garantindo o cumprimento dos direitos do trabalhador. Com perda do prazo, a ocorrência pode ser descaracterizada.'
+              },
+              {
+                type:'multiple',
+                q:'Qual é a diferença entre EPI e EPC?',
+                options:[
+                  'EPI protege coletivamente e EPC é para uso individual',
+                  'EPI é de uso individual para proteção do trabalhador; EPC é de uso coletivo, instalado no ambiente',
+                  'EPI é obrigatório apenas para líderes; EPC é para todos os colaboradores',
+                  'EPI e EPC são sinônimos com a mesma finalidade'
+                ],
+                answer:1,
+                explanation:'EPI (Equipamento de Proteção Individual) é de uso individual, destinado à proteção do trabalhador. EPC (Equipamento de Proteção Coletiva) é instalado no ambiente para proteger todos coletivamente.'
+              },
+              {
+                type:'multiple',
+                q:'Qual o comportamento correto ao identificar um pacote com produto líquido vazando (Avaria Líquida)?',
+                options:[
+                  'Colocar o pacote em cima de outros para evitar que o líquido espalhe pelo chão',
+                  'Solicitar que a liderança acione o time de Tratativas, não colocar sobre outros pacotes e encaminhar para a área de Tratativas após limpeza',
+                  'Bipar o pacote normalmente e alocar em um unitizador separado identificado',
+                  'Devolver o pacote ao motorista imediatamente'
+                ],
+                answer:1,
+                explanation:'Em caso de Avaria Líquida, deve-se: acionar a liderança para chamar Tratativas; NÃO colocar sobre outros pacotes para evitar que o líquido escorra; realizar limpeza imediata e encaminhar para área de Tratativas.'
+              },
+              {
+                type:'truefalse',
+                q:'É permitido entrar ou sentar dentro de uma gaiola durante a operação.',
+                answer:false,
+                explanation:'Não. É expressamente proibido entrar, sentar ou se escorar na gaiola. Em caso de gaiola em movimento, não toque e aguarde até que o equipamento pare completamente.'
+              },
+              {
+                type:'multiple',
+                q:'Conforme a NR 12, o que deve ser feito se um pacote prender nas junções ou laterais da correia da esteira?',
+                options:[
+                  'Retirar o pacote manualmente com cuidado enquanto a esteira ainda está em movimento',
+                  'Parar a esteira pelo cordão de emergência e aguardar o time de manutenção ou liderança',
+                  'Usar uma ferramenta para empurrar o pacote enquanto a esteira está em movimento',
+                  'Ignorar e aguardar o pacote se soltar naturalmente'
+                ],
+                answer:1,
+                explanation:'Nunca tente retirar pacotes encravados com o transportador em movimento. Deve-se parar o equipamento usando o cordão de emergência e acionar a liderança ou o time de manutenção.'
+              },
+              {
+                type:'multiple',
+                q:'O que é o programa OPA (Observe, Planeje e Aja) no contexto do HSE?',
+                options:[
+                  'Um programa de premiação para colaboradores com melhor desempenho em segurança',
+                  'Um programa para registrar todos os desvios presentes no ambiente de trabalho e tratá-los, além de permitir reconhecer colegas',
+                  'Um sistema de check-in e check-out para controle de ponto dos colaboradores',
+                  'Um treinamento obrigatório apenas para líderes e supervisores'
+                ],
+                answer:1,
+                explanation:'O OPA registra todos os desvios (situações fora dos padrões de segurança) presentes no ambiente para que sejam tratados. Também permite reconhecer/elogiar colegas. O registro é feito por QR Code.'
+              },
+              {
+                type:'order',
+                q:'Ordene os passos para usar um extintor de incêndio corretamente:',
+                steps:[
+                  'Apertar o gatilho e mover o jato em movimentos laterais na base do fogo',
+                  'Retirar o pino de segurança',
+                  'Manter distância segura e continuar até apagar as chamas',
+                  'Apontar o bico na direção da base do fogo'
+                ],
+                correctOrder:[1,3,0,2],
+                explanation:'Sequência correta: Retirar o pino de segurança → Apontar o bico na base do fogo → Apertar o gatilho com movimentos laterais → Manter distância e continuar até apagar as chamas.'
+              }
+            ]
+          }
+        ]
+      },
       {
         id:'mod_recebimento_soc',
         title:'Recebimento - SOC',
@@ -2865,72 +3204,6 @@ async function initData() {
           }
         ]
       },
-      {
-        id:'mod_onboarding',
-        title:'Onboarding',
-        description:'Bem-vindo à Shopee Academy! Conheça os processos, regras e cultura da operação. PDFs e materiais de integração disponíveis.',
-        icon:'🎓',
-        color:'linear-gradient(135deg,#EE4D2D,#F39C12)',
-        lessons:[
-          {
-            id:'mod_onboarding_l1',
-            title:'Boas-vindas e Cultura da Operação',
-            description:'Introdução à Shopee, valores e comportamentos esperados',
-            xpReward:50,
-            questions:[
-              {
-                type:'multiple',
-                q:'O que é a Shopee Xpress Brasil (SPX)?',
-                options:[
-                  'Uma plataforma de e-commerce',
-                  'O braço logístico da Shopee, responsável pelo transporte e entrega de pacotes',
-                  'Um sistema de pagamentos digitais',
-                  'Uma rede de lojas físicas'
-                ],
-                answer:1,
-                explanation:'A Shopee Xpress Brasil (SPX) é a operação logística da Shopee, responsável pelo transporte, sorting e entrega dos pacotes aos clientes finais.'
-              },
-              {
-                type:'truefalse',
-                q:'O uso correto de EPIs (Equipamentos de Proteção Individual) é obrigatório durante toda a operação no SOC.',
-                answer:true,
-                explanation:'Correto. O uso de EPIs é obrigatório para garantir a segurança de todos os colaboradores durante as operações no SOC.'
-              },
-              {
-                type:'multiple',
-                q:'O que significa SLA na operação da Shopee?',
-                options:[
-                  'Sistema de Logística Avançada',
-                  'Service Level Agreement — acordo de nível de serviço que define prazos e metas',
-                  'Setor de Limpeza e Armazenagem',
-                  'Software de Localização Automática'
-                ],
-                answer:1,
-                explanation:'SLA (Service Level Agreement) é o acordo de nível de serviço que define prazos e metas de qualidade que a operação deve cumprir, como tempo de entrega e taxa de pacotes processados.'
-              },
-              {
-                type:'truefalse',
-                q:'É permitido utilizar o celular pessoal durante a operação de sorting e packing nas esteiras.',
-                answer:false,
-                explanation:'Não é permitido usar celular pessoal durante a operação. O uso de dispositivos pessoais pode causar distrações e acidentes, além de representar risco de perda ou dano aos equipamentos.'
-              },
-              {
-                type:'order',
-                q:'Ordene as etapas do fluxo geral de um pacote no SOC:',
-                steps:[
-                  'Expedição e saída do SOC',
-                  'Recebimento no SOC (doca)',
-                  'Buffer de Recebimento',
-                  'Sorting e Packing',
-                  'Stage Out'
-                ],
-                correctOrder:[1,2,3,4,0],
-                explanation:'Fluxo padrão: Recebimento → Buffer → Sorting/Packing → Stage Out → Expedição.'
-              }
-            ]
-          }
-        ]
-      }
     ];
 
   if(needsReseed) {
