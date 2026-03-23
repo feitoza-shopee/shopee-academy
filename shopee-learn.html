@@ -1116,8 +1116,11 @@ body {
     <!-- content injected by JS -->
   </div>
 
-  <div id="page-crm" class="page-content hidden"></div>
-  <div id="page-admin" class="page-content hidden">
+  <div id="page-crm" class="page-content hidden" style="overflow-y:auto;max-height:calc(100vh - 160px);"></div>
+  <div id="page-admin" class="page-content hidden" style="overflow-y:auto;max-height:calc(100vh - 160px);">
+    <!-- content injected by JS -->
+  </div>
+  <div id="page-users" class="page-content hidden" style="overflow-y:auto;max-height:calc(100vh - 160px);">
     <!-- content injected by JS -->
   </div>
 
@@ -1137,6 +1140,9 @@ body {
     </button>
     <button class="nav-item hidden" onclick="switchPage('crm')" id="nav-crm">
       <span class="nav-icon">📊</span>CRM
+    </button>
+    <button class="nav-item hidden" onclick="switchPage('users')" id="nav-users">
+      <span class="nav-icon">👥</span>Usuários
     </button>
   </div>
 </div>
@@ -1262,7 +1268,7 @@ async function initData() {
   });
 
   // Modules DB — seed PDF modules if missing, preserve admin-created ones
-  const PDF_MODULES_VERSION = 'v4';
+  const PDF_MODULES_VERSION = 'v5';
   const seededVersion = localStorage.getItem('sa_modules_version');
   const needsReseed = seededVersion !== PDF_MODULES_VERSION;
 
@@ -2858,6 +2864,72 @@ async function initData() {
             ]
           }
         ]
+      },
+      {
+        id:'mod_onboarding',
+        title:'Onboarding',
+        description:'Bem-vindo à Shopee Academy! Conheça os processos, regras e cultura da operação. PDFs e materiais de integração disponíveis.',
+        icon:'🎓',
+        color:'linear-gradient(135deg,#EE4D2D,#F39C12)',
+        lessons:[
+          {
+            id:'mod_onboarding_l1',
+            title:'Boas-vindas e Cultura da Operação',
+            description:'Introdução à Shopee, valores e comportamentos esperados',
+            xpReward:50,
+            questions:[
+              {
+                type:'multiple',
+                q:'O que é a Shopee Xpress Brasil (SPX)?',
+                options:[
+                  'Uma plataforma de e-commerce',
+                  'O braço logístico da Shopee, responsável pelo transporte e entrega de pacotes',
+                  'Um sistema de pagamentos digitais',
+                  'Uma rede de lojas físicas'
+                ],
+                answer:1,
+                explanation:'A Shopee Xpress Brasil (SPX) é a operação logística da Shopee, responsável pelo transporte, sorting e entrega dos pacotes aos clientes finais.'
+              },
+              {
+                type:'truefalse',
+                q:'O uso correto de EPIs (Equipamentos de Proteção Individual) é obrigatório durante toda a operação no SOC.',
+                answer:true,
+                explanation:'Correto. O uso de EPIs é obrigatório para garantir a segurança de todos os colaboradores durante as operações no SOC.'
+              },
+              {
+                type:'multiple',
+                q:'O que significa SLA na operação da Shopee?',
+                options:[
+                  'Sistema de Logística Avançada',
+                  'Service Level Agreement — acordo de nível de serviço que define prazos e metas',
+                  'Setor de Limpeza e Armazenagem',
+                  'Software de Localização Automática'
+                ],
+                answer:1,
+                explanation:'SLA (Service Level Agreement) é o acordo de nível de serviço que define prazos e metas de qualidade que a operação deve cumprir, como tempo de entrega e taxa de pacotes processados.'
+              },
+              {
+                type:'truefalse',
+                q:'É permitido utilizar o celular pessoal durante a operação de sorting e packing nas esteiras.',
+                answer:false,
+                explanation:'Não é permitido usar celular pessoal durante a operação. O uso de dispositivos pessoais pode causar distrações e acidentes, além de representar risco de perda ou dano aos equipamentos.'
+              },
+              {
+                type:'order',
+                q:'Ordene as etapas do fluxo geral de um pacote no SOC:',
+                steps:[
+                  'Expedição e saída do SOC',
+                  'Recebimento no SOC (doca)',
+                  'Buffer de Recebimento',
+                  'Sorting e Packing',
+                  'Stage Out'
+                ],
+                correctOrder:[1,2,3,4,0],
+                explanation:'Fluxo padrão: Recebimento → Buffer → Sorting/Packing → Stage Out → Expedição.'
+              }
+            ]
+          }
+        ]
       }
     ];
 
@@ -2920,12 +2992,14 @@ function hideLoading() {
   document.getElementById('loading-overlay').classList.add('hidden');
 }
 function switchPage(page) {
-  ['home','lessons','ranking','profile','admin','crm'].forEach(p => {
-    document.getElementById('page-'+p).classList.add('hidden');
+  ['home','lessons','ranking','profile','admin','crm','users'].forEach(p => {
+    const el = document.getElementById('page-'+p);
+    if(el) el.classList.add('hidden');
     const nb = document.getElementById('nav-'+p);
     if(nb) nb.classList.remove('active');
   });
-  document.getElementById('page-'+page).classList.remove('hidden');
+  const pageEl = document.getElementById('page-'+page);
+  if(pageEl) pageEl.classList.remove('hidden');
   const nb = document.getElementById('nav-'+page);
   if(nb) nb.classList.add('active');
 
@@ -2933,6 +3007,7 @@ function switchPage(page) {
   if(page==='profile') renderProfile();
   if(page==='admin') renderAdmin();
   if(page==='crm') renderCRM();
+  if(page==='users') renderUsersPanel();
 }
 function updateNavStats() {
   const u = state.currentUser;
@@ -3182,6 +3257,7 @@ async function handleLogin() {
   if(user.isAdmin) {
     document.getElementById('nav-admin').classList.remove('hidden');
     document.getElementById('nav-crm').classList.remove('hidden');
+    document.getElementById('nav-users').classList.remove('hidden');
   }
 
   renderHome();
@@ -4247,12 +4323,12 @@ async function renderAdmin() {
       </div>
     </div>
 
-    <!-- Users Management moved to CRM -->
+    <!-- Users Panel link -->
     <div class="admin-card" style="border-color:var(--blue);background:linear-gradient(135deg,#EBF5FB,#fff);">
-      <h3>📊 Gerenciamento de Colaboradores</h3>
-      <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:14px;">O gerenciamento completo de colaboradores foi movido para o painel CRM.</p>
-      <button onclick="switchPage('crm')" style="width:100%;padding:14px;background:linear-gradient(135deg,#2980B9,#3498DB);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(52,152,219,0.4);">
-        📊 Acessar Painel CRM →
+      <h3>👥 Gestão de Usuários</h3>
+      <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:14px;">Visualize todos os colaboradores, acessos do dia e aplique filtros avançados.</p>
+      <button onclick="switchPage('users')" style="width:100%;padding:14px;background:linear-gradient(135deg,#2980B9,#3498DB);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(52,152,219,0.4);">
+        👥 Acessar Gestão de Usuários →
       </button>
     </div>
   `;
@@ -5048,6 +5124,121 @@ function loadAPIKeyStatus() {
 }
 
 // ============================================================
+// USERS PANEL
+// ============================================================
+async function renderUsersPanel() {
+  const pageEl = document.getElementById('page-users');
+  if(!pageEl) return;
+  pageEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-weight:700;">🔄 Carregando usuários...</div>';
+
+  const { data: usersData } = await getDB().from('users').select('*');
+  (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
+  const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
+
+  // Read filters
+  const filterDay    = document.getElementById('users-filter-day')   ? document.getElementById('users-filter-day').value   : '';
+  const filterShift  = document.getElementById('users-filter-shift') ? document.getElementById('users-filter-shift').value : '';
+  const filterUnit   = document.getElementById('users-filter-unit')  ? document.getElementById('users-filter-unit').value  : '';
+
+  const todayStr = today();
+  const units  = [...new Set(allUsers.map(u => u.unit))].sort();
+  const shifts = ['T1','T2','T3','ADM'];
+
+  // Apply filters
+  let filtered = allUsers;
+  if(filterDay)   filtered = filtered.filter(u => u.lastActive === filterDay);
+  if(filterShift) filtered = filtered.filter(u => u.shift === filterShift);
+  if(filterUnit)  filtered = filtered.filter(u => u.unit  === filterUnit);
+
+  // Today's accessors (ignore other filters for the "today" block)
+  const todayUsers = allUsers.filter(u => u.lastActive === todayStr);
+
+  const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
+
+  const userRow = (u) => {
+    const done = (u.completedLessons||[]).length;
+    const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
+    const isActiveToday = u.lastActive === todayStr;
+    return `<div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1.5px solid var(--border);display:flex;align-items:center;gap:10px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}${u.nickname?' <span style="font-size:10px;color:var(--shopee);font-weight:700;">("'+u.nickname+'")</span>':''}</div>
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · T${u.shift}</div>
+        <div style="font-size:10px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">
+          <span style="color:var(--gold);font-weight:700;">⭐${u.xp||0}</span>
+          <span style="color:var(--shopee);font-weight:700;">🔥${u.streak||0}</span>
+          <span style="color:var(--blue);font-weight:700;">📚${done}/${totalLessons}</span>
+          <span style="color:${isActiveToday?'var(--green)':'var(--text2)'};font-weight:700;">${isActiveToday?'🟢 Hoje':'⚪ '+u.lastActive}</span>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:900;color:${pct>=60?'var(--green)':pct>=30?'var(--blue)':'var(--text2)'};">${pct}%</div>
+    </div>`;
+  };
+
+  pageEl.innerHTML = `
+    <h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">👥 Gestão de Usuários</h2>
+    <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px;">Todos os colaboradores cadastrados — CPF visível</p>
+
+    <!-- FILTERS -->
+    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">
+      <div style="font-weight:900;font-size:13px;margin-bottom:12px;color:var(--shopee);">🔽 Filtros</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Unidade</label>
+          <select id="users-filter-unit" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
+            <option value="">Todas</option>
+            ${units.map(u => `<option value="${u}"${filterUnit===u?' selected':''}>${u}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Turno</label>
+          <select id="users-filter-shift" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
+            <option value="">Todos</option>
+            ${shifts.map(s => `<option value="${s}"${filterShift===s?' selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Filtrar por Dia (Último acesso)</label>
+        <input type="date" id="users-filter-day" value="${filterDay}" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;" />
+      </div>
+    </div>
+
+    <!-- TODAY'S ACCESSES HIGHLIGHT -->
+    <div style="background:linear-gradient(135deg,#27AE60,#2ECC71);border-radius:16px;padding:16px;margin-bottom:16px;color:#fff;">
+      <div style="font-weight:900;font-size:15px;margin-bottom:2px;">🟢 Acessaram Hoje — ${todayStr}</div>
+      <div style="font-size:28px;font-weight:900;margin-bottom:8px;">${todayUsers.length} <span style="font-size:14px;opacity:0.85;">colaborador(es)</span></div>
+      <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+        ${todayUsers.length === 0
+          ? '<div style="font-size:13px;opacity:0.85;text-align:center;padding:10px;">Nenhum acesso registrado hoje ainda.</div>'
+          : todayUsers.map(u => `<div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
+              <div>
+                <div style="font-size:12px;font-weight:800;">${u.name}</div>
+                <div style="font-size:10px;opacity:0.85;">${u.id} · ${u.unit} · ${u.shift}</div>
+              </div>
+              <div style="margin-left:auto;font-size:11px;font-weight:700;opacity:0.9;">⭐${u.xp||0}</div>
+            </div>`).join('')
+        }
+      </div>
+    </div>
+
+    <!-- ALL USERS LIST -->
+    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:80px;border:2px solid var(--border);box-shadow:var(--shadow);">
+      <div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">
+        👤 Todos os Usuários 
+        <span style="background:var(--shopee);color:#fff;font-size:11px;padding:2px 8px;border-radius:100px;margin-left:6px;">${filtered.length}</span>
+        ${(filterDay||filterShift||filterUnit) ? '<span style="font-size:11px;color:var(--text2);font-weight:600;margin-left:6px;">(filtrado)</span>' : ''}
+      </div>
+      ${filtered.length === 0
+        ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:20px;">Nenhum usuário encontrado com esses filtros.</p>'
+        : filtered.sort((a,b) => a.name.localeCompare(b.name)).map(userRow).join('')
+      }
+    </div>
+  `;
+}
+
+// ============================================================
 // BOOT
 // ============================================================
 // Boot after DOM is ready
@@ -5081,6 +5272,7 @@ window.checkAnswer = checkAnswer;
 window.goHome = goHome;
 window.logout = logout;
 window.renderAdmin = renderAdmin;
+window.renderUsersPanel = renderUsersPanel;
 window.grantAdmin = grantAdmin;
 window.moveModule = moveModule;
 window.revokeAdmin = revokeAdmin;
