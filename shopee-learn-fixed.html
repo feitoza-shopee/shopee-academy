@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shopee Academy</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --border: #F0E0DC;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family:'Nunito',sans-serif;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* FIX PRINCIPAL */
+.main-content, .screen.active {
+  flex:1;
+  padding-bottom:120px;
+}
+
+/* MENU INFERIOR */
+.bottom-nav {
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  height:80px;
+  background:#fff;
+  border-top:2px solid var(--border);
+  display:flex;
+  z-index:100;
+}
+
+.nav-item {
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* QUIZ FOOTER */
+.quiz-footer {
+  position:fixed;
+  bottom:80px;
+  left:0;
+  right:0;
+  background:#fff;
+  border-top:2px solid var(--border);
+  padding:16px;
+}
+</style>
+</head>
+<body>
+
+<div class="screen active main-content">
+  <!-- Seu conteúdo aqui -->
+</div>
+
+<div class="bottom-nav">
+  <div class="nav-item">Home</div>
+  <div class="nav-item">Perfil</div>
+  <div class="nav-item">Admin</div>
+</div>
+
+</body>
+</html>
