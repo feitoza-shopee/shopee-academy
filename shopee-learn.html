@@ -3864,28 +3864,28 @@ async function renderCRM() {
   const units = [...new Set(allUsers.map(u=>u.unit))].sort();
   const shifts = ['T1','T2','T3','ADM'];
 
-  // By shift stats
+  // By shift stats — uses filtered users
   const byShift = shifts.map(s => ({
     shift: s,
     total: users.filter(u=>u.shift===s).length,
     active: users.filter(u=>u.shift===s && u.lastActive===todayStr).length
   })).filter(s=>s.total>0);
 
-  // By unit stats
+  // By unit stats — uses filtered users
   const byUnit = units.map(u => ({
     unit: u,
     total: users.filter(x=>x.unit===u).length,
     active: users.filter(x=>x.unit===u && x.lastActive===todayStr).length,
     withProgress: users.filter(x=>x.unit===u && (x.completedLessons||[]).length>0).length
-  }));
+  })).filter(x=>x.total>0);
 
-  // Last 7 days activity
+  // Last 7 days activity — uses filtered users
   const last7 = [];
   for(let i=6; i>=0; i--) {
     const d = new Date();
     d.setDate(d.getDate()-i);
     const ds = d.toISOString().slice(0,10);
-    last7.push({ date: ds, label: d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit'}), count: allUsers.filter(u=>u.lastActive===ds).length });
+    last7.push({ date: ds, label: d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit'}), count: users.filter(u=>u.lastActive===ds).length });
   }
   const maxActivity = Math.max(...last7.map(d=>d.count), 1);
 
@@ -4256,12 +4256,18 @@ async function renderAdmin() {
     <!-- Upload PDF -->
     <div class="admin-card">
       <h3>📄 Importar Conteúdo via PDF + IA</h3>
-      <div class="upload-zone" onclick="document.getElementById('pdf-input').click()">
+      <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:12px;">Selecione um ou mais PDFs. O sistema vai gerar perguntas automaticamente com IA para cada arquivo.</p>
+      <div class="upload-zone" id="pdf-drop-zone"
+        onclick="document.getElementById('pdf-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--shopee)';this.style.background='#FFF8F6'"
+        ondragleave="this.style.borderColor='';this.style.background=''"
+        ondrop="event.preventDefault();this.style.borderColor='';this.style.background='';handlePDFDrop(event)">
         <div class="upload-icon">📁</div>
-        <p>Clique para selecionar PDF</p>
-        <small>O sistema vai gerar perguntas automaticamente com IA</small>
+        <p>Clique ou arraste PDFs aqui</p>
+        <small>Suporta múltiplos arquivos — cada PDF gera suas próprias perguntas</small>
       </div>
-      <input type="file" id="pdf-input" accept=".pdf" style="display:none" onchange="handlePDFUpload(event)"/>
+      <input type="file" id="pdf-input" accept=".pdf" multiple style="display:none" onchange="handlePDFUpload(event)"/>
+      <div id="pdf-file-list" style="margin-top:10px;"></div>
       <div id="pdf-status" style="margin-top:10px"></div>
       <div id="generated-qs" class="generated-questions hidden"></div>
       <div id="btn-add-module" class="hidden" style="margin-top:12px">
@@ -4323,12 +4329,12 @@ async function renderAdmin() {
       </div>
     </div>
 
-    <!-- Users Panel link -->
+    <!-- CRM link only -->
     <div class="admin-card" style="border-color:var(--blue);background:linear-gradient(135deg,#EBF5FB,#fff);">
-      <h3>👥 Gestão de Usuários</h3>
-      <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:14px;">Visualize todos os colaboradores, acessos do dia e aplique filtros avançados.</p>
-      <button onclick="switchPage('users')" style="width:100%;padding:14px;background:linear-gradient(135deg,#2980B9,#3498DB);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(52,152,219,0.4);">
-        👥 Acessar Gestão de Usuários →
+      <h3>📊 Painel CRM</h3>
+      <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:14px;">Acompanhe métricas, atividade e distribuição de colaboradores.</p>
+      <button onclick="switchPage('crm')" style="width:100%;padding:14px;background:linear-gradient(135deg,#2980B9,#3498DB);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(52,152,219,0.4);">
+        📊 Acessar Painel CRM →
       </button>
     </div>
   `;
@@ -4836,31 +4842,191 @@ function showToast(msg) {
 // ============================================================
 // PDF UPLOAD + AI QUESTION GENERATION
 // ============================================================
+// Handle drag-and-drop
+function handlePDFDrop(event) {
+  const files = Array.from(event.dataTransfer.files).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+  if(files.length === 0) { showToast('⚠️ Apenas arquivos PDF são aceitos.'); return; }
+  processPDFFiles(files);
+}
+
 async function handlePDFUpload(event) {
-  const file = event.target.files[0];
-  if(!file) return;
+  const files = Array.from(event.target.files);
+  if(!files.length) return;
+  processPDFFiles(files);
+  // Reset input so same files can be re-selected if needed
+  event.target.value = '';
+}
 
-  // Store file reference for library registration
-  state._pendingPDFFile = file;
-
+async function processPDFFiles(files) {
+  // Show selected files list
+  const fileListEl = document.getElementById('pdf-file-list');
   const statusEl = document.getElementById('pdf-status');
-  statusEl.innerHTML = `
-    <div class="generating-indicator">
-      <div class="spinner"></div>
-      <div>
-        <div style="font-weight:800;font-size:14px">Lendo o PDF...</div>
-        <div style="font-size:12px;color:var(--text2)">Extraindo texto para análise</div>
-      </div>
-    </div>
-  `;
+  const genEl = document.getElementById('generated-qs');
+  const btnAdd = document.getElementById('btn-add-module');
 
-  // Read PDF as text using FileReader (base64 then send to Claude)
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const base64 = e.target.result.split(',')[1];
-    await generateQuestionsFromPDF(base64, file.name);
-  };
-  reader.readAsDataURL(file);
+  genEl.classList.add('hidden');
+  btnAdd.classList.add('hidden');
+  state.generatedQuestions = [];
+  state._pendingPDFFiles = files;
+
+  fileListEl.innerHTML = '<div style="font-weight:800;font-size:13px;margin-bottom:8px;color:var(--text);">📎 Arquivos selecionados:</div>' +
+    files.map((f,i) => `<div style="display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:6px;border:1.5px solid var(--border);">
+      <span style="font-size:16px;">📄</span>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:800;">${f.name}</div>
+        <div style="font-size:10px;color:var(--text2);">${(f.size/1024).toFixed(1)} KB</div>
+      </div>
+      <div id="pdf-status-${i}" style="font-size:11px;font-weight:700;color:var(--text2);">⏳ Aguardando</div>
+    </div>`).join('');
+
+  statusEl.innerHTML = '';
+
+  // Process all files — for multi-file, process each and accumulate questions
+  if(files.length === 1) {
+    // Single file: original flow
+    state._pendingPDFFile = files[0];
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const base64 = e.target.result.split(',')[1];
+      document.getElementById('pdf-status-0').textContent = '🔄 Processando...';
+      document.getElementById('pdf-status-0').style.color = 'var(--blue)';
+      await generateQuestionsFromPDF(base64, files[0].name);
+      document.getElementById('pdf-status-0').textContent = '✅ Pronto';
+      document.getElementById('pdf-status-0').style.color = 'var(--green)';
+    };
+    reader.readAsDataURL(files[0]);
+  } else {
+    // Multiple files: process sequentially, accumulate all questions
+    let allQuestions = [];
+    const apiKey = getAPIKey();
+    if(!apiKey) {
+      statusEl.innerHTML = '<div class="error-msg">❌ API Key não configurada. Vá em Admin > Configuração da API Key.</div>';
+      return;
+    }
+    statusEl.innerHTML = `<div class="generating-indicator"><div class="spinner"></div><div><div style="font-weight:800;font-size:14px">🤖 Processando ${files.length} PDFs...</div><div style="font-size:12px;color:var(--text2)">Aguarde enquanto a IA analisa cada arquivo</div></div></div>`;
+
+    for(let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const statusBadge = document.getElementById('pdf-status-' + i);
+      if(statusBadge) { statusBadge.textContent = '🔄 Processando...'; statusBadge.style.color = 'var(--blue)'; }
+      try {
+        const base64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = e => res(e.target.result.split(',')[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        const qs = await generateQuestionsFromPDFRaw(base64, file.name, apiKey);
+        allQuestions = allQuestions.concat(qs);
+        if(statusBadge) { statusBadge.textContent = `✅ ${qs.length} questões`; statusBadge.style.color = 'var(--green)'; }
+        // Register each PDF
+        registerPDFInLibrary(file, file.name.replace(/\.pdf$/i,''));
+      } catch(err) {
+        if(statusBadge) { statusBadge.textContent = '❌ Erro'; statusBadge.style.color = 'var(--shopee)'; }
+        console.error('Error processing', file.name, err);
+      }
+    }
+
+    state.generatedQuestions = allQuestions;
+    state._pendingPDFFile = null;
+    state._pendingPDFFiles = null;
+
+    statusEl.innerHTML = '';
+    if(allQuestions.length === 0) {
+      statusEl.innerHTML = '<div class="error-msg">❌ Nenhuma questão foi gerada. Verifique os PDFs e a API Key.</div>';
+      return;
+    }
+
+    genEl.classList.remove('hidden');
+    genEl.innerHTML = `
+      <div style="font-weight:900;font-size:14px;margin-bottom:8px;color:var(--green)">✅ ${allQuestions.length} questões geradas de ${files.length} PDFs!</div>
+      ${allQuestions.map((q,i)=>`
+        <div class="gen-q-item">
+          <div class="q-type-tag">${q.type==='multiple'?'Múltipla Escolha':q.type==='truefalse'?'V ou F':'Ordenar'}</div>
+          ${q.q}
+        </div>
+      `).join('')}
+    `;
+    btnAdd.classList.remove('hidden');
+  }
+}
+
+// Raw version — returns questions array (no UI updates), used for multi-file processing
+async function generateQuestionsFromPDFRaw(base64Data, filename, apiKey) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:3000,
+      messages:[{
+        role:'user',
+        content:[
+          {
+            type:'document',
+            source:{ type:'base64', media_type:'application/pdf', data:base64Data }
+          },
+          {
+            type:'text',
+            text:`Analise este documento sobre processos da Shopee e gere exatamente 8 questões educativas em JSON.
+
+Retorne SOMENTE um array JSON válido, sem texto extra, sem markdown, sem \`\`\`. Siga este formato:
+[
+  {
+    "type": "multiple",
+    "q": "Pergunta de múltipla escolha?",
+    "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
+    "answer": 1,
+    "explanation": "Explicação curta do porquê está correto."
+  },
+  {
+    "type": "truefalse",
+    "q": "Afirmação verdadeira ou falsa.",
+    "answer": true,
+    "explanation": "Explicação curta."
+  },
+  {
+    "type": "order",
+    "q": "Ordene as etapas do processo:",
+    "steps": ["Passo A", "Passo B", "Passo C", "Passo D"],
+    "correctOrder": [0, 1, 2, 3],
+    "explanation": "Explicação da ordem correta."
+  }
+]
+
+Gere uma mistura: pelo menos 4 multiple choice, 2 verdadeiro/falso, 2 order. Todas as perguntas devem ser baseadas no conteúdo real do documento.`
+          }
+        ]
+      }]
+    })
+  });
+
+  if(!response.ok) {
+    let errMsg = response.statusText;
+    try { const e = await response.json(); errMsg = e?.error?.message || errMsg; } catch(x){}
+    throw new Error('Erro da API (' + response.status + '): ' + errMsg);
+  }
+
+  const data = await response.json();
+  const rawText = data.content?.find(c=>c.type==='text')?.text || '';
+  if(!rawText) throw new Error('A IA não retornou conteúdo.');
+
+  let questions;
+  try { questions = JSON.parse(rawText.trim()); }
+  catch(e1) {
+    try { const match = rawText.match(/\[[\s\S]*\]/); if(match) questions = JSON.parse(match[0]); else throw new Error('no array'); }
+    catch(e2) {
+      try { const clean = rawText.replace(/```json|```/g,'').trim(); questions = JSON.parse(clean); }
+      catch(e3) { throw new Error('Erro ao interpretar resposta da IA.'); }
+    }
+  }
+  if(!Array.isArray(questions) || questions.length === 0) throw new Error('Nenhuma questão válida gerada.');
+  return questions;
 }
 
 async function generateQuestionsFromPDF(base64Data, filename) {
@@ -5136,9 +5302,10 @@ async function renderUsersPanel() {
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
 
   // Read filters
-  const filterDay    = document.getElementById('users-filter-day')   ? document.getElementById('users-filter-day').value   : '';
-  const filterShift  = document.getElementById('users-filter-shift') ? document.getElementById('users-filter-shift').value : '';
-  const filterUnit   = document.getElementById('users-filter-unit')  ? document.getElementById('users-filter-unit').value  : '';
+  const filterDay   = document.getElementById('users-filter-day')    ? document.getElementById('users-filter-day').value    : '';
+  const filterShift = document.getElementById('users-filter-shift')  ? document.getElementById('users-filter-shift').value  : '';
+  const filterUnit  = document.getElementById('users-filter-unit')   ? document.getElementById('users-filter-unit').value   : '';
+  const searchQuery = document.getElementById('users-search-input')  ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
 
   const todayStr = today();
   const units  = [...new Set(allUsers.map(u => u.unit))].sort();
@@ -5149,21 +5316,26 @@ async function renderUsersPanel() {
   if(filterDay)   filtered = filtered.filter(u => u.lastActive === filterDay);
   if(filterShift) filtered = filtered.filter(u => u.shift === filterShift);
   if(filterUnit)  filtered = filtered.filter(u => u.unit  === filterUnit);
+  if(searchQuery) filtered = filtered.filter(u =>
+    u.name.toLowerCase().includes(searchQuery) ||
+    u.id.toLowerCase().includes(searchQuery) ||
+    (u.nickname||'').toLowerCase().includes(searchQuery)
+  );
 
-  // Today's accessors (ignore other filters for the "today" block)
+  // Today's accessors
   const todayUsers = allUsers.filter(u => u.lastActive === todayStr);
-
   const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
 
   const userRow = (u) => {
     const done = (u.completedLessons||[]).length;
     const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
     const isActiveToday = u.lastActive === todayStr;
+    const safeName = u.name.replace(/'/g,"&#39;");
     return `<div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1.5px solid var(--border);display:flex;align-items:center;gap:10px;">
       <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}${u.nickname?' <span style="font-size:10px;color:var(--shopee);font-weight:700;">("'+u.nickname+'")</span>':''}</div>
-        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · T${u.shift}</div>
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · ${u.shift}</div>
         <div style="font-size:10px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">
           <span style="color:var(--gold);font-weight:700;">⭐${u.xp||0}</span>
           <span style="color:var(--shopee);font-weight:700;">🔥${u.streak||0}</span>
@@ -5171,7 +5343,10 @@ async function renderUsersPanel() {
           <span style="color:${isActiveToday?'var(--green)':'var(--text2)'};font-weight:700;">${isActiveToday?'🟢 Hoje':'⚪ '+u.lastActive}</span>
         </div>
       </div>
-      <div style="font-size:12px;font-weight:900;color:${pct>=60?'var(--green)':pct>=30?'var(--blue)':'var(--text2)'};">${pct}%</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        <div style="font-size:12px;font-weight:900;color:${pct>=60?'var(--green)':pct>=30?'var(--blue)':'var(--text2)'};">${pct}%</div>
+        <button onclick="deleteUserFromPanel('${u.id}','${safeName}')" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:4px 8px;font-size:10px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;white-space:nowrap;">🗑️ Excluir</button>
+      </div>
     </div>`;
   };
 
@@ -5179,8 +5354,19 @@ async function renderUsersPanel() {
     <h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">👥 Gestão de Usuários</h2>
     <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px;">Todos os colaboradores cadastrados — CPF visível</p>
 
+    <!-- SEARCH -->
+    <div style="background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;border:2px solid var(--border);box-shadow:var(--shadow);">
+      <div style="font-weight:900;font-size:13px;margin-bottom:10px;color:var(--shopee);">🔍 Pesquisar Colaborador</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="users-search-input" placeholder="Nome, CPF ou apelido..." value="${searchQuery}"
+          oninput="renderUsersPanel()"
+          style="flex:1;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Nunito,sans-serif;font-size:14px;font-weight:600;outline:none;" />
+        ${searchQuery ? `<button onclick="document.getElementById('users-search-input').value='';renderUsersPanel()" style="padding:10px 14px;background:var(--bg);border:2px solid var(--border);border-radius:10px;font-family:Nunito,sans-serif;font-size:13px;font-weight:800;cursor:pointer;color:var(--text2);">✕</button>` : ''}
+      </div>
+    </div>
+
     <!-- FILTERS -->
-    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">
+    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;border:2px solid var(--border);box-shadow:var(--shadow);">
       <div style="font-weight:900;font-size:13px;margin-bottom:12px;color:var(--shopee);">🔽 Filtros</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div>
@@ -5204,20 +5390,27 @@ async function renderUsersPanel() {
       </div>
     </div>
 
-    <!-- TODAY'S ACCESSES HIGHLIGHT -->
-    <div style="background:linear-gradient(135deg,#27AE60,#2ECC71);border-radius:16px;padding:16px;margin-bottom:16px;color:#fff;">
-      <div style="font-weight:900;font-size:15px;margin-bottom:2px;">🟢 Acessaram Hoje — ${todayStr}</div>
-      <div style="font-size:28px;font-weight:900;margin-bottom:8px;">${todayUsers.length} <span style="font-size:14px;opacity:0.85;">colaborador(es)</span></div>
-      <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+    <!-- TODAY'S ACCESSES HIGHLIGHT + EXCEL EXPORT -->
+    <div style="background:linear-gradient(135deg,#27AE60,#2ECC71);border-radius:16px;padding:16px;margin-bottom:14px;color:#fff;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div>
+          <div style="font-weight:900;font-size:15px;">🟢 Acessaram Hoje — ${todayStr}</div>
+          <div style="font-size:28px;font-weight:900;margin-top:2px;">${todayUsers.length} <span style="font-size:14px;opacity:0.85;">colaborador(es)</span></div>
+        </div>
+        <button onclick="exportTodayToExcel()" style="background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.6);color:#fff;border-radius:10px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+          📥 Exportar Excel
+        </button>
+      </div>
+      <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-top:8px;">
         ${todayUsers.length === 0
           ? '<div style="font-size:13px;opacity:0.85;text-align:center;padding:10px;">Nenhum acesso registrado hoje ainda.</div>'
           : todayUsers.map(u => `<div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
               <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
-              <div>
+              <div style="flex:1;">
                 <div style="font-size:12px;font-weight:800;">${u.name}</div>
                 <div style="font-size:10px;opacity:0.85;">${u.id} · ${u.unit} · ${u.shift}</div>
               </div>
-              <div style="margin-left:auto;font-size:11px;font-weight:700;opacity:0.9;">⭐${u.xp||0}</div>
+              <div style="font-size:11px;font-weight:700;opacity:0.9;">⭐${u.xp||0}</div>
             </div>`).join('')
         }
       </div>
@@ -5225,17 +5418,76 @@ async function renderUsersPanel() {
 
     <!-- ALL USERS LIST -->
     <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:80px;border:2px solid var(--border);box-shadow:var(--shadow);">
-      <div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">
-        👤 Todos os Usuários 
-        <span style="background:var(--shopee);color:#fff;font-size:11px;padding:2px 8px;border-radius:100px;margin-left:6px;">${filtered.length}</span>
-        ${(filterDay||filterShift||filterUnit) ? '<span style="font-size:11px;color:var(--text2);font-weight:600;margin-left:6px;">(filtrado)</span>' : ''}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-weight:900;font-size:14px;color:var(--text);">
+          👤 Todos os Usuários
+          <span style="background:var(--shopee);color:#fff;font-size:11px;padding:2px 8px;border-radius:100px;margin-left:6px;">${filtered.length}</span>
+          ${(filterDay||filterShift||filterUnit||searchQuery) ? '<span style="font-size:11px;color:var(--text2);font-weight:600;margin-left:6px;">(filtrado)</span>' : ''}
+        </div>
       </div>
       ${filtered.length === 0
-        ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:20px;">Nenhum usuário encontrado com esses filtros.</p>'
+        ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:20px;">Nenhum usuário encontrado.</p>'
         : filtered.sort((a,b) => a.name.localeCompare(b.name)).map(userRow).join('')
       }
     </div>
   `;
+}
+
+async function deleteUserFromPanel(uid, name) {
+  if(!confirm('Excluir a conta de ' + name + '? Esta ação não pode ser desfeita.')) return;
+  const { error } = await getDB().from('users').delete().eq('id', uid);
+  if(error) { alert('Erro ao excluir: ' + error.message); return; }
+  delete state.users[uid];
+  showToast('🗑️ Conta de ' + name + ' excluída.');
+  renderUsersPanel();
+}
+
+function exportTodayToExcel() {
+  const todayStr = today();
+  const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
+  const todayUsers = allUsers.filter(u => u.lastActive === todayStr);
+  const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
+
+  if(todayUsers.length === 0) {
+    alert('Nenhum acesso registrado hoje para exportar.');
+    return;
+  }
+
+  const headers = ['Nome','Apelido','CPF','Unidade','Turno','XP','Streak','Lições Concluídas','Total Lições','Progresso (%)','Último Acesso'];
+  const rows = todayUsers.map(u => {
+    const done = (u.completedLessons||[]).length;
+    const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
+    return [
+      u.name,
+      u.nickname||'',
+      u.id,
+      u.unit,
+      u.shift,
+      u.xp||0,
+      u.streak||0,
+      done,
+      totalLessons,
+      pct+'%',
+      u.lastActive
+    ];
+  });
+
+  // Build CSV with BOM for Excel UTF-8
+  const BOM = '\uFEFF';
+  const csvContent = BOM + [headers, ...rows]
+    .map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(';'))
+    .join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'acessos_' + todayStr + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📥 Excel exportado: ' + todayUsers.length + ' colaborador(es).');
 }
 
 // ============================================================
@@ -5273,6 +5525,8 @@ window.goHome = goHome;
 window.logout = logout;
 window.renderAdmin = renderAdmin;
 window.renderUsersPanel = renderUsersPanel;
+window.deleteUserFromPanel = deleteUserFromPanel;
+window.exportTodayToExcel = exportTodayToExcel;
 window.grantAdmin = grantAdmin;
 window.moveModule = moveModule;
 window.revokeAdmin = revokeAdmin;
@@ -5299,6 +5553,7 @@ window.saveAPIKey = saveAPIKey;
 window.toggleAPIKeyVisibility = toggleAPIKeyVisibility;
 window.checkAPIKeyInput = checkAPIKeyInput;
 window.saveGeneratedLesson = saveGeneratedLesson;
+window.handlePDFDrop = handlePDFDrop;
 window.maskCPF = maskCPF;
 window.validarCPF = validarCPF;
 
