@@ -4058,6 +4058,48 @@ async function searchUser() {
     '</div>';
 }
 
+async function grantAdmin() {
+  const cpf = document.getElementById('grant-admin-cpf').value.trim();
+  const msgEl = document.getElementById('grant-admin-msg');
+
+  if(!validarCPF(cpf)) {
+    msgEl.innerHTML = '<div class="error-msg">❌ CPF inválido.</div>';
+    return;
+  }
+
+  const { data: row } = await getDB().from('users').select('*').eq('id', cpf).single();
+  if(!row) {
+    msgEl.innerHTML = '<div class="error-msg">❌ Colaborador não encontrado.</div>';
+    return;
+  }
+  if(row.is_admin) {
+    msgEl.innerHTML = '<div class="error-msg">⚠️ Este colaborador já é administrador.</div>';
+    return;
+  }
+
+  const { error } = await getDB().from('users').update({ is_admin: true }).eq('id', cpf);
+  if(error) {
+    msgEl.innerHTML = '<div class="error-msg">❌ Erro: ' + error.message + '</div>';
+    return;
+  }
+
+  if(state.users[cpf]) state.users[cpf].isAdmin = true;
+  document.getElementById('grant-admin-cpf').value = '';
+  msgEl.innerHTML = '<div style="background:#EAFAF1;border:1px solid var(--green);color:#1E8449;padding:8px 12px;border-radius:8px;font-weight:700;font-size:12px;">✅ Acesso admin concedido para <strong>' + row.name + '</strong>!</div>';
+  setTimeout(() => renderAdmin(), 1500);
+}
+
+async function revokeAdmin(uid, name) {
+  if(!confirm('Remover acesso admin de ' + name + '?')) return;
+
+  const { error } = await getDB().from('users').update({ is_admin: false }).eq('id', uid);
+  if(error) { alert('Erro: ' + error.message); return; }
+
+  if(state.users[uid]) state.users[uid].isAdmin = false;
+  showToast('🛡️ Acesso admin removido de ' + name + '.');
+  renderAdmin();
+}
+
 async function renderAdmin() {
   // Reload users fresh from Supabase
   const { data: usersData } = await getDB().from('users').select('*');
@@ -4164,6 +4206,45 @@ async function renderAdmin() {
       <h3>📚 Biblioteca de PDFs</h3>
       <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:14px;">PDFs importados e usados para gerar conteúdo no app.</p>
       <div id="pdf-library-list">${renderPDFLibrary()}</div>
+    </div>
+
+    <!-- Admin Access Management -->
+    <div class="admin-card" style="border-color:#8E44AD;background:linear-gradient(135deg,#F5EEF8,#fff);">
+      <h3>🛡️ Gerenciar Acesso Admin</h3>
+      <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:14px;">
+        Conceda ou remova acesso de administrador a colaboradores.
+      </p>
+
+      <!-- Search to grant admin -->
+      <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:12px;border:2px dashed #D7BDE2;">
+        <div style="font-weight:900;font-size:12px;margin-bottom:8px;color:#8E44AD;">➕ Conceder Acesso Admin</div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="grant-admin-cpf" placeholder="CPF do colaborador" maxlength="14"
+            oninput="maskCPF(this)"
+            onkeydown="if(event.key==='Enter') grantAdmin()"
+            style="flex:1;padding:10px 12px;border:2px solid var(--border);border-radius:8px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:600;outline:none;" />
+          <button onclick="grantAdmin()" style="padding:10px 14px;background:linear-gradient(135deg,#8E44AD,#9B59B6);color:#fff;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;">
+            Conceder
+          </button>
+        </div>
+        <div id="grant-admin-msg" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- Current admins list -->
+      <div style="font-weight:900;font-size:12px;margin-bottom:8px;color:#8E44AD;">👑 Administradores Atuais</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${Object.values(state.users).filter(u=>u.isAdmin).map(u => {
+          const isMe = u.id === state.currentUser.id;
+          return '<div style="background:var(--bg);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;">' +
+            '<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8E44AD,#9B59B6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;">' + u.name.charAt(0) + '</div>' +
+            '<div style="flex:1;">' +
+              '<div style="font-size:13px;font-weight:800;">' + u.name + (isMe ? ' <span style=\"font-size:10px;background:#8E44AD;color:#fff;padding:2px 6px;border-radius:100px;\">Você</span>' : '') + '</div>' +
+              '<div style="font-size:11px;color:var(--text2);">' + u.id + ' · ' + u.unit + '</div>' +
+            '</div>' +
+            (!isMe ? '<button onclick="revokeAdmin(\'' + u.id + '\',\'' + u.name.replace(/'/g,"&#39;") + '\')" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;font-family:\'Nunito\',sans-serif;">Remover</button>' : '') +
+          '</div>';
+        }).join('')}
+      </div>
     </div>
 
     <!-- Users Management moved to CRM -->
@@ -4979,6 +5060,8 @@ window.checkAnswer = checkAnswer;
 window.goHome = goHome;
 window.logout = logout;
 window.renderAdmin = renderAdmin;
+window.grantAdmin = grantAdmin;
+window.revokeAdmin = revokeAdmin;
 window.renderCRM = renderCRM;
 window.searchUser = searchUser;
 window.openModule = openModule;
