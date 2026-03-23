@@ -978,7 +978,7 @@ body {
         ✏️ Primeiro acesso? Cadastre-se
       </button>
       <div style="text-align:center;margin-top:16px;font-size:11px;color:#1A1A1A;font-weight:700;letter-spacing:0.5px;">
-        Desenvolvido por Feitoza-Soc-pe2
+        Desenvolvido por Feitoza- COP/Soc-pe2
       </div>
     </div>
 
@@ -1116,6 +1116,7 @@ body {
     <!-- content injected by JS -->
   </div>
 
+  <div id="page-crm" class="page-content hidden"></div>
   <div id="page-admin" class="page-content hidden">
     <!-- content injected by JS -->
   </div>
@@ -1133,6 +1134,9 @@ body {
     </button>
     <button class="nav-item hidden" onclick="switchPage('admin')" id="nav-admin">
       <span class="nav-icon">⚙️</span>Admin
+    </button>
+    <button class="nav-item hidden" onclick="switchPage('crm')" id="nav-crm">
+      <span class="nav-icon">📊</span>CRM
     </button>
   </div>
 </div>
@@ -2916,7 +2920,7 @@ function hideLoading() {
   document.getElementById('loading-overlay').classList.add('hidden');
 }
 function switchPage(page) {
-  ['home','lessons','ranking','profile','admin'].forEach(p => {
+  ['home','lessons','ranking','profile','admin','crm'].forEach(p => {
     document.getElementById('page-'+p).classList.add('hidden');
     const nb = document.getElementById('nav-'+p);
     if(nb) nb.classList.remove('active');
@@ -2928,6 +2932,7 @@ function switchPage(page) {
   if(page==='ranking') renderRanking();
   if(page==='profile') renderProfile();
   if(page==='admin') renderAdmin();
+  if(page==='crm') renderCRM();
 }
 function updateNavStats() {
   const u = state.currentUser;
@@ -3176,6 +3181,7 @@ async function handleLogin() {
 
   if(user.isAdmin) {
     document.getElementById('nav-admin').classList.remove('hidden');
+    document.getElementById('nav-crm').classList.remove('hidden');
   }
 
   renderHome();
@@ -3748,6 +3754,237 @@ function logout() {
   }
 }
 
+
+// ============================================================
+// CRM PANEL
+// ============================================================
+async function renderCRM() {
+  const pageEl = document.getElementById('page-crm');
+  pageEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-weight:700;">🔄 Carregando CRM...</div>';
+
+  const { data: usersData } = await getDB().from('users').select('*');
+  (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
+  const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
+
+  // Read filters
+  const filterUnit = document.getElementById('crm-filter-unit') ? document.getElementById('crm-filter-unit').value : '';
+  const filterShift = document.getElementById('crm-filter-shift') ? document.getElementById('crm-filter-shift').value : '';
+  const filterDateFrom = document.getElementById('crm-date-from') ? document.getElementById('crm-date-from').value : '';
+  const filterDateTo = document.getElementById('crm-date-to') ? document.getElementById('crm-date-to').value : '';
+
+  // Apply filters
+  let users = allUsers;
+  if(filterUnit) users = users.filter(u => u.unit === filterUnit);
+  if(filterShift) users = users.filter(u => u.shift === filterShift);
+  if(filterDateFrom) users = users.filter(u => u.lastActive >= filterDateFrom);
+  if(filterDateTo) users = users.filter(u => u.lastActive <= filterDateTo);
+
+  const todayStr = today();
+  const active = users.filter(u => u.lastActive === todayStr);
+  const withProgress = users.filter(u => (u.completedLessons||[]).length > 0);
+  const totalLessons = state.modules.reduce((a,m)=>a+m.lessons.length,0);
+
+  // By unit stats
+  const units = [...new Set(allUsers.map(u=>u.unit))].sort();
+  const shifts = ['T1','T2','T3','ADM'];
+
+  // By shift stats
+  const byShift = shifts.map(s => ({
+    shift: s,
+    total: users.filter(u=>u.shift===s).length,
+    active: users.filter(u=>u.shift===s && u.lastActive===todayStr).length
+  })).filter(s=>s.total>0);
+
+  // By unit stats
+  const byUnit = units.map(u => ({
+    unit: u,
+    total: users.filter(x=>x.unit===u).length,
+    active: users.filter(x=>x.unit===u && x.lastActive===todayStr).length,
+    withProgress: users.filter(x=>x.unit===u && (x.completedLessons||[]).length>0).length
+  }));
+
+  // Last 7 days activity
+  const last7 = [];
+  for(let i=6; i>=0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate()-i);
+    const ds = d.toISOString().slice(0,10);
+    last7.push({ date: ds, label: d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit'}), count: allUsers.filter(u=>u.lastActive===ds).length });
+  }
+  const maxActivity = Math.max(...last7.map(d=>d.count), 1);
+
+  // Top users by XP
+  const topUsers = [...users].sort((a,b)=>(b.xp||0)-(a.xp||0)).slice(0,5);
+
+  // Level distribution
+  const levels = [
+    { label:'Iniciante', color:'#999', count: users.filter(u=>{ const d=(u.completedLessons||[]).length; const p=totalLessons?Math.round(d/totalLessons*100):0; return p===0; }).length },
+    { label:'Básico', color:'#E67E22', count: users.filter(u=>{ const d=(u.completedLessons||[]).length; const p=totalLessons?Math.round(d/totalLessons*100):0; return p>0&&p<30; }).length },
+    { label:'Intermediário', color:'#3498DB', count: users.filter(u=>{ const d=(u.completedLessons||[]).length; const p=totalLessons?Math.round(d/totalLessons*100):0; return p>=30&&p<60; }).length },
+    { label:'Avançado', color:'#9B59B6', count: users.filter(u=>{ const d=(u.completedLessons||[]).length; const p=totalLessons?Math.round(d/totalLessons*100):0; return p>=60&&p<90; }).length },
+    { label:'Expert', color:'#2ECC71', count: users.filter(u=>{ const d=(u.completedLessons||[]).length; const p=totalLessons?Math.round(d/totalLessons*100):0; return p>=90; }).length },
+  ];
+  const maxLevel = Math.max(...levels.map(l=>l.count), 1);
+
+  const avgXP = users.length ? Math.round(users.reduce((a,u)=>a+(u.xp||0),0)/users.length) : 0;
+  const avgProgress = users.length ? Math.round(users.reduce((a,u)=>{ const d=(u.completedLessons||[]).length; return a+(totalLessons?Math.round(d/totalLessons*100):0); },0)/users.length) : 0;
+
+  pageEl.innerHTML =
+    '<h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">📊 Painel CRM</h2>' +
+    '<p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:20px;">Acompanhamento e gestão de colaboradores</p>' +
+
+    // FILTERS
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:13px;margin-bottom:12px;color:var(--shopee);">🔽 Filtros</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
+        '<div><label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Unidade</label>' +
+        '<select id="crm-filter-unit" onchange="renderCRM()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">' +
+          '<option value="">Todas</option>' +
+          units.map(u => '<option value="'+u+'"'+(filterUnit===u?' selected':'')+'>'+u+'</option>').join('') +
+        '</select></div>' +
+        '<div><label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Turno</label>' +
+        '<select id="crm-filter-shift" onchange="renderCRM()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">' +
+          '<option value="">Todos</option>' +
+          shifts.map(s => '<option value="'+s+'"'+(filterShift===s?' selected':'')+'>'+s+'</option>').join('') +
+        '</select></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+        '<div><label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Data Início</label>' +
+        '<input type="date" id="crm-date-from" value="'+filterDateFrom+'" onchange="renderCRM()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;" /></div>' +
+        '<div><label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Data Fim</label>' +
+        '<input type="date" id="crm-date-to" value="'+filterDateTo+'" onchange="renderCRM()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;" /></div>' +
+      '</div>' +
+    '</div>' +
+
+    // KPI CARDS
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">' +
+      '<div style="background:linear-gradient(135deg,var(--shopee),var(--shopee-light));border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:28px;font-weight:900;">'+users.length+'</div>' +
+        '<div style="font-size:11px;font-weight:700;opacity:0.9;text-transform:uppercase;">Total Colaboradores</div>' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,#27AE60,#2ECC71);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:28px;font-weight:900;">'+active.length+'</div>' +
+        '<div style="font-size:11px;font-weight:700;opacity:0.9;text-transform:uppercase;">Ativos Hoje</div>' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,#2980B9,#3498DB);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:28px;font-weight:900;">'+withProgress.length+'</div>' +
+        '<div style="font-size:11px;font-weight:700;opacity:0.9;text-transform:uppercase;">Com Progresso</div>' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,#8E44AD,#9B59B6);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:28px;font-weight:900;">'+avgProgress+'%</div>' +
+        '<div style="font-size:11px;font-weight:700;opacity:0.9;text-transform:uppercase;">Progresso Médio</div>' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,#F39C12,#F5A623);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:28px;font-weight:900;">⭐'+avgXP+'</div>' +
+        '<div style="font-size:11px;font-weight:700;opacity:0.9;text-transform:uppercase;">XP Médio</div>' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,#1ABC9C,#16A085);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:28px;font-weight:900;">'+(users.length?Math.round(active.length/users.length*100):0)+'%</div>' +
+        '<div style="font-size:11px;font-weight:700;opacity:0.9;text-transform:uppercase;">Taxa Ativação</div>' +
+      '</div>' +
+    '</div>' +
+
+    // ACTIVITY CHART - last 7 days
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:14px;margin-bottom:14px;color:var(--text);">📈 Atividade — Últimos 7 dias</div>' +
+      '<div style="display:flex;align-items:flex-end;gap:6px;height:80px;padding-bottom:4px;">' +
+        last7.map(d => {
+          const h = Math.max(Math.round((d.count/maxActivity)*72), d.count>0?8:4);
+          const isToday = d.date === todayStr;
+          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">' +
+            '<div style="font-size:10px;font-weight:800;color:'+(isToday?'var(--shopee)':'var(--text2)')+';">'+d.count+'</div>' +
+            '<div style="width:100%;height:'+h+'px;background:'+(isToday?'var(--shopee)':'#AED6F1')+';border-radius:4px 4px 0 0;transition:height 0.4s;"></div>' +
+            '<div style="font-size:9px;color:'+(isToday?'var(--shopee)':'var(--text2)')+';font-weight:700;text-align:center;">'+d.label+'</div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>' +
+
+    // BY UNIT
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">🏢 Por Unidade</div>' +
+      (byUnit.length === 0 ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:10px;">Nenhum dado disponível.</p>' :
+      byUnit.map(u => {
+        const pct = users.length ? Math.round(u.total/users.length*100) : 0;
+        return '<div style="margin-bottom:12px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+            '<span style="font-size:13px;font-weight:800;">'+u.unit+'</span>' +
+            '<div style="display:flex;gap:10px;">' +
+              '<span style="font-size:11px;color:var(--text2);font-weight:700;">👥 '+u.total+'</span>' +
+              '<span style="font-size:11px;color:var(--green);font-weight:700;">🟢 '+u.active+'</span>' +
+              '<span style="font-size:11px;color:var(--blue);font-weight:700;">📚 '+u.withProgress+'</span>' +
+            '</div>' +
+          '</div>' +
+          '<div style="background:var(--bg);border-radius:100px;height:8px;overflow:hidden;">' +
+            '<div style="height:100%;border-radius:100px;background:linear-gradient(90deg,var(--shopee),var(--shopee-light));width:'+pct+'%;transition:width 0.6s;"></div>' +
+          '</div>' +
+        '</div>';
+      }).join('')) +
+    '</div>' +
+
+    // BY SHIFT
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">🕐 Por Turno</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">' +
+        (byShift.length === 0 ? '<p style="color:var(--text2);font-size:13px;grid-column:1/-1;text-align:center;padding:10px;">Nenhum dado.</p>' :
+        byShift.map((s,i) => {
+          const colors = ['#EE4D2D','#3498DB','#9B59B6','#E67E22'];
+          return '<div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center;">' +
+            '<div style="font-size:11px;font-weight:900;color:'+colors[i%4]+';text-transform:uppercase;margin-bottom:4px;">Turno '+s.shift+'</div>' +
+            '<div style="font-size:22px;font-weight:900;color:var(--text);">'+s.total+'</div>' +
+            '<div style="font-size:11px;color:var(--text2);font-weight:700;">'+s.active+' ativos hoje</div>' +
+          '</div>';
+        }).join('')) +
+      '</div>' +
+    '</div>' +
+
+    // LEVEL DISTRIBUTION
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">🎯 Distribuição por Nível</div>' +
+      levels.map(l => {
+        const pct = users.length ? Math.round(l.count/users.length*100) : 0;
+        return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+          '<div style="width:80px;font-size:11px;font-weight:800;color:'+l.color+';">'+l.label+'</div>' +
+          '<div style="flex:1;background:var(--bg);border-radius:100px;height:10px;overflow:hidden;">' +
+            '<div style="height:100%;border-radius:100px;background:'+l.color+';width:'+pct+'%;transition:width 0.6s;"></div>' +
+          '</div>' +
+          '<div style="width:40px;text-align:right;font-size:12px;font-weight:800;color:var(--text2);">'+l.count+'</div>' +
+        '</div>';
+      }).join('') +
+    '</div>' +
+
+    // TOP USERS
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">🏅 Top 5 — Maior XP</div>' +
+      (topUsers.length === 0 ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:10px;">Nenhum colaborador ainda.</p>' :
+      topUsers.map((u,i) => {
+        const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+        const done = (u.completedLessons||[]).length;
+        const pct = totalLessons ? Math.round(done/totalLessons*100) : 0;
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="font-size:20px;">'+medals[i]+'</div>' +
+          '<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;">'+u.name.charAt(0)+'</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:13px;font-weight:800;">'+u.name+'</div>' +
+            '<div style="font-size:11px;color:var(--text2);">'+u.unit+' · '+u.shift+' · '+pct+'% completo</div>' +
+          '</div>' +
+          '<div style="font-size:13px;font-weight:900;color:var(--gold);">⭐ '+(u.xp||0)+'</div>' +
+        '</div>';
+      }).join('')) +
+    '</div>' +
+
+    // SEARCH & DELETE USER
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">🔍 Pesquisar Colaborador por CPF</div>' +
+      '<div style="display:flex;gap:8px;">' +
+        '<input type="text" id="search-cpf" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)" onkeydown="if(event.key===\'Enter\') searchUser()" style="flex:1;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-family:Nunito,sans-serif;font-size:14px;font-weight:600;outline:none;" />' +
+        '<button onclick="searchUser()" style="padding:12px 16px;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;border:none;border-radius:10px;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer;">Buscar</button>' +
+      '</div>' +
+      '<div id="search-result" style="margin-top:12px;"></div>' +
+    '</div>';
+}
+
+
 // ============================================================
 // ADMIN PANEL
 // ============================================================
@@ -3929,95 +4166,13 @@ async function renderAdmin() {
       <div id="pdf-library-list">${renderPDFLibrary()}</div>
     </div>
 
-    <!-- Users Management -->
-    <div class="admin-card">
-      <h3>👥 Gerenciar Colaboradores (${users.length})</h3>
-
-      <!-- Campo de pesquisa por CPF -->
-      <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:16px;border:2px dashed var(--border);">
-        <div style="font-weight:900;font-size:13px;margin-bottom:10px;color:var(--shopee)">🔍 Pesquisar Colaborador por CPF</div>
-        <div style="display:flex;gap:8px;">
-          <input type="text" id="search-cpf" placeholder="000.000.000-00" maxlength="14"
-            oninput="maskCPF(this)"
-            style="flex:1;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:600;outline:none;"
-            onkeydown="if(event.key==='Enter') searchUser()" />
-          <button onclick="searchUser()" style="padding:12px 16px;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;cursor:pointer;">
-            Buscar
-          </button>
-        </div>
-        <div id="search-result" style="margin-top:12px;"></div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-        <div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center;">
-          <div style="font-size:22px;font-weight:900;color:var(--shopee)">${users.length}</div>
-          <div style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Colaboradores</div>
-        </div>
-        <div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center;">
-          <div style="font-size:22px;font-weight:900;color:var(--blue)">${users.filter(u=>u.lastActive===today()).length}</div>
-          <div style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Ativos Hoje</div>
-        </div>
-        <div style="background:var(--bg);border-radius:12px;padding:12px;text-align:center;">
-          <div style="font-size:22px;font-weight:900;color:var(--green)">${users.filter(u=>(u.completedLessons||[]).length>0).length}</div>
-          <div style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Com Progresso</div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        ${users.map(u => {
-          const totalLessons = state.modules.reduce((a,m)=>a+m.lessons.length,0);
-          const done = (u.completedLessons||[]).length;
-          const pct = totalLessons ? Math.round(done/totalLessons*100) : 0;
-          const level = pct===0?'Iniciante':pct<30?'Básico':pct<60?'Intermediário':pct<90?'Avançado':'Expert';
-          const levelColor = pct===0?'#999':pct<30?'#E67E22':pct<60?'#3498DB':pct<90?'#9B59B6':'#2ECC71';
-          const accesses = u.totalAccesses || 1;
-          const totalMin = u.totalMinutes || 0;
-          const isActiveToday = u.lastActive === today();
-          return `
-          <div style="background:var(--bg);border-radius:14px;padding:14px;border:2px solid ${isActiveToday?'var(--green)':'var(--border)'};">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-              <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-weight:800;font-size:14px;">${u.name}</div>
-                <div style="font-size:11px;color:var(--text2);">${u.id} · ${u.unit} · ${u.shift}</div>
-              </div>
-              <span style="background:${levelColor};color:#fff;font-size:10px;font-weight:900;padding:3px 8px;border-radius:100px;">${level}</span>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;">
-              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 4px;">
-                <div style="font-size:14px;font-weight:900;color:var(--gold)">⭐${u.xp||0}</div>
-                <div style="font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase">XP</div>
-              </div>
-              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 4px;">
-                <div style="font-size:14px;font-weight:900;color:var(--shopee)">🔥${u.streak||0}</div>
-                <div style="font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase">Streak</div>
-              </div>
-              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 4px;">
-                <div style="font-size:14px;font-weight:900;color:var(--blue)">📲${accesses}</div>
-                <div style="font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase">Acessos</div>
-              </div>
-              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 4px;">
-                <div style="font-size:14px;font-weight:900;color:var(--purple)">⏱${totalMin}m</div>
-                <div style="font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase">Tempo</div>
-              </div>
-            </div>
-            <div style="margin-bottom:8px;">
-              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px;">
-                <span>Progresso: ${done}/${totalLessons} lições</span>
-                <span style="color:${levelColor}">${pct}%</span>
-              </div>
-              <div style="background:#fff;border-radius:100px;height:8px;overflow:hidden;">
-                <div style="height:100%;border-radius:100px;background:${levelColor};width:${pct}%;transition:width 0.6s ease;"></div>
-              </div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:11px;color:${isActiveToday?'var(--green)':'var(--text2)'};font-weight:700;">
-                ${isActiveToday?'🟢 Ativo hoje':'⚪ Último acesso: '+u.lastActive}
-              </span>
-              <button class="btn-danger" onclick="deleteUser('${u.id}','${u.name}')">🗑️ Excluir</button>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
+    <!-- Users Management moved to CRM -->
+    <div class="admin-card" style="border-color:var(--blue);background:linear-gradient(135deg,#EBF5FB,#fff);">
+      <h3>📊 Gerenciamento de Colaboradores</h3>
+      <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:14px;">O gerenciamento completo de colaboradores foi movido para o painel CRM.</p>
+      <button onclick="switchPage('crm')" style="width:100%;padding:14px;background:linear-gradient(135deg,#2980B9,#3498DB);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(52,152,219,0.4);">
+        📊 Acessar Painel CRM →
+      </button>
     </div>
   `;
   document.getElementById('page-admin').innerHTML = html;
@@ -4824,6 +4979,7 @@ window.checkAnswer = checkAnswer;
 window.goHome = goHome;
 window.logout = logout;
 window.renderAdmin = renderAdmin;
+window.renderCRM = renderCRM;
 window.searchUser = searchUser;
 window.openModule = openModule;
 window.backToHome = backToHome;
