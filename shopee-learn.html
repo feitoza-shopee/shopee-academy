@@ -4535,14 +4535,14 @@ async function renderAdmin() {
         <label>Anthropic API Key</label>
         <div style="position:relative">
           <input type="password" id="api-key-input" placeholder="sk-ant-..."
-            style="padding-right:48px" id="api-key-input-field" />
+            style="padding-right:48px" oninput="checkAPIKeyInput()" />
           <button onclick="toggleAPIKeyVisibility()"
             style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;"
             id="toggle-key-btn">👁️</button>
         </div>
       </div>
       <div id="api-key-status" style="margin-bottom:10px"></div>
-      <button class="btn-primary" onclick="saveAPIKey()" id="btn-save-key" style="opacity:0.5" disabled>💾 Salvar API Key</button>
+      <button class="btn-primary" onclick="saveAPIKey()" id="btn-save-key">💾 Salvar API Key</button>
     </div>
 
     <!-- Upload PDF -->
@@ -5670,13 +5670,10 @@ function getAPIKey() {
 function checkAPIKeyInput() {
   const val = document.getElementById('api-key-input').value.trim();
   const btn = document.getElementById('btn-save-key');
-  if(val.startsWith('sk-ant-') && val.length > 20) {
-    btn.disabled = false;
-    btn.style.opacity = '1';
-  } else {
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-  }
+  if(!btn) return;
+  // Never disable — always let user try to save; validation happens in saveAPIKey
+  btn.disabled = false;
+  btn.style.opacity = '1';
 }
 
 function toggleAPIKeyVisibility() {
@@ -5711,11 +5708,13 @@ function loadAPIKeyStatus() {
   const inputEl = document.getElementById('api-key-input');
   const btnEl = document.getElementById('btn-save-key');
   if(!statusEl) return;
+  // Always keep button enabled
+  if(btnEl) { btnEl.disabled = false; btnEl.style.opacity = '1'; }
   if(key) {
     statusEl.innerHTML =
       '<div style="background:#EAFAF1;border:1px solid var(--green);color:#1E8449;padding:10px 14px;border-radius:8px;font-weight:700;font-size:13px;">✅ API Key configurada! Últimos dígitos: ...'+key.slice(-6)+'</div>';
-    inputEl.placeholder = 'Clique para substituir a chave atual';
-    btnEl.textContent = '🔄 Atualizar API Key';
+    if(inputEl) { inputEl.placeholder = 'Clique para substituir a chave atual'; }
+    if(btnEl) { btnEl.textContent = '🔄 Atualizar API Key'; }
   } else {
     statusEl.innerHTML =
       '<div style="background:#FFF8E1;border:1px solid var(--gold);color:#7D6608;padding:10px 14px;border-radius:8px;font-weight:700;font-size:13px;">⚠️ Nenhuma API Key configurada. A geração de perguntas não funcionará.</div>';
