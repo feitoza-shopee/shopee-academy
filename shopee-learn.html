@@ -1609,6 +1609,117 @@ async function initData() {
                 explanation:'Sequência correta: Retirar o pino de segurança → Apontar o bico na base do fogo → Apertar o gatilho com movimentos laterais → Manter distância e continuar até apagar as chamas.'
               }
             ]
+          },
+          {
+            id:'mod_onboarding_l4',
+            title:'HSE — Equipamentos, NRs e Emergências',
+            description:'NR 11, NR 12, gaiolas, paleteiras, esteiras, sorter, ergonomia e plano de emergência',
+            xpReward:100,
+            questions:[
+              {
+                type:'multiple',
+                q:'Conforme a NR 11, qual é o limite de gaiolas VAZIAS que podem ser engatadas para movimentação?',
+                options:[
+                  '3 gaiolas vazias',
+                  '10 gaiolas vazias',
+                  '5 gaiolas vazias',
+                  '7 gaiolas vazias'
+                ],
+                answer:2,
+                explanation:'A NR 11 e as orientações de HSE determinam que o engate máximo é de 5 gaiolas vazias por vez. Gaiolas cheias devem ser movimentadas uma por vez.'
+              },
+              {
+                type:'truefalse',
+                q:'Ao conduzir uma paleteira hidráulica, o colaborador deve estar posicionado à frente do timão e conduzi-la sempre puxando lateralmente.',
+                answer:true,
+                explanation:'Correto. O uso correto da paleteira hidráulica exige que o operador esteja posicionado à frente do timão e conduza puxando lateralmente. Ao parar, o garfo deve ser sempre abaixado.'
+              },
+              {
+                type:'multiple',
+                q:'Ao trabalhar próximo às esteiras transportadoras, qual dos itens abaixo é PROIBIDO segundo a NR 12 e as normas de HSE?',
+                options:[
+                  'Usar touca para proteger o cabelo',
+                  'Manter o colete refletivo fechado e sem partes soltas',
+                  'Tentar retirar pacotes encravados enquanto a esteira está em movimento',
+                  'Inspecionar visualmente o equipamento antes de operar'
+                ],
+                answer:2,
+                explanation:'É estritamente proibido tentar retirar pacotes encravados com a esteira em movimento — há risco crítico de acidente. O correto é acionar a liderança ou equipe de manutenção.'
+              },
+              {
+                type:'multiple',
+                q:'No Sorter (Sorting NC — Pacotes Irregulares), qual é o limite de peso por pacote?',
+                options:[
+                  '20 kg',
+                  '15 kg',
+                  '12 kg',
+                  '8 kg'
+                ],
+                answer:2,
+                explanation:'Conforme o procedimento do Sorter para Sorting NC (pacotes irregulares), o limite é de 12 kg por pacote. Para pacotes regulares no processamento, o limite é de 20 kg.'
+              },
+              {
+                type:'order',
+                q:'Ordene os passos corretos para fechar uma saca no Sorter após a luz verde acender:',
+                steps:[
+                  'Puxar o suporte da saca e retirar a saca',
+                  'Pegar a TO na impressora',
+                  'Apertar 2 vezes o botão verde para acionar o fechamento',
+                  'Puxar a porta de bloqueio para impedir queda de pacotes',
+                  'Colar as TOs no corpo da saca em lados opostos'
+                ],
+                correctOrder:[2,3,1,0,4],
+                explanation:'Sequência: apertar 2x botão verde → puxar porta de bloqueio → pegar TO na impressora → puxar suporte e retirar a saca → colar TOs em lados opostos.'
+              },
+              {
+                type:'truefalse',
+                q:'Pacotes com peso superior a 20 kg ou tamanho superior a 80 cm devem obrigatoriamente ser movimentados em dupla.',
+                answer:true,
+                explanation:'Correto. Segundo as normas de ergonomia do HSE: pacotes acima de 20 kg ou com tamanho superior a 80 cm exigem movimentação em dupla para prevenir lesões osteomusculares.'
+              },
+              {
+                type:'multiple',
+                q:'Em caso de crise convulsiva de um colega, qual é a atitude CORRETA segundo as orientações de primeiros socorros do HSE?',
+                options:[
+                  'Conter os movimentos da pessoa para evitar que ela se machuque',
+                  'Colocar algo na boca da pessoa para evitar que ela morda a língua',
+                  'Afastar objetos perigosos e deitar a pessoa de lado após a crise',
+                  'Levantar a pessoa imediatamente e levá-la ao ambulatório'
+                ],
+                answer:2,
+                explanation:'Em crises convulsivas: afaste objetos perigosos, proteja a cabeça e deite de lado (posição de recuperação) após a crise. Nunca contenha os movimentos nem coloque nada na boca. Acione o SAMU (192).'
+              },
+              {
+                type:'multiple',
+                q:'Qual extintor (classe) deve ser utilizado para combater incêndio em equipamentos elétricos energizados?',
+                options:[
+                  'Classe A — para materiais sólidos',
+                  'Classe B — para combustíveis líquidos',
+                  'Classe C — para equipamentos elétricos energizados',
+                  'Classe D — para metais combustíveis'
+                ],
+                answer:2,
+                explanation:'O extintor Classe C é específico para equipamentos elétricos energizados. O extintor ABC cobre as três classes (A, B e C). Nunca use água em incêndios elétricos.'
+              },
+              {
+                type:'truefalse',
+                q:'A botoeira de parada de emergência das esteiras pode ser acionada a qualquer momento, mesmo sem situação de risco, para treinar o procedimento.',
+                answer:false,
+                explanation:'Incorreto. A botoeira ou corda de emergência deve ser acionada APENAS em situações reais de emergência. O reset após o acionamento deve ser realizado pelo time de manutenção ou liderança.'
+              },
+              {
+                type:'multiple',
+                q:'Segundo as orientações de segurança com veículos, qual das ações abaixo é PERMITIDA ao colaborador na área de docas?',
+                options:[
+                  'Auxiliar o motorista a estacionar nas docas',
+                  'Abrir ou fechar as portas do baú do caminhão',
+                  'Validar os dados do motorista no lugar do ajudante',
+                  'Registrar um OPA e comunicar a liderança ao identificar irregularidades'
+                ],
+                answer:3,
+                explanation:'É expressamente proibido auxiliar o motorista, abrir/fechar portas do baú (só o motorista/ajudante) e validar dados pelo ajudante. A ação correta ao identificar irregularidades é abrir um OPA e comunicar a liderança.'
+              }
+            ]
           }
         ]
       },
