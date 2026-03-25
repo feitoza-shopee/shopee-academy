@@ -1274,7 +1274,7 @@ async function initData() {
   });
 
   // Modules DB — seed PDF modules if missing, preserve admin-created ones
-  const PDF_MODULES_VERSION = 'v6';
+  const PDF_MODULES_VERSION = 'v7';
   const seededVersion = localStorage.getItem('sa_modules_version');
   const needsReseed = seededVersion !== PDF_MODULES_VERSION;
 
