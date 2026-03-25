@@ -4109,17 +4109,18 @@ function logout() {
 // ============================================================
 async function renderCRM() {
   const pageEl = document.getElementById('page-crm');
+
+  // Read filters BEFORE clearing innerHTML (elements get destroyed on innerHTML reset)
+  const filterUnit     = document.getElementById('crm-filter-unit')  ? document.getElementById('crm-filter-unit').value  : '';
+  const filterShift    = document.getElementById('crm-filter-shift') ? document.getElementById('crm-filter-shift').value : '';
+  const filterDateFrom = document.getElementById('crm-date-from')    ? document.getElementById('crm-date-from').value    : '';
+  const filterDateTo   = document.getElementById('crm-date-to')      ? document.getElementById('crm-date-to').value      : '';
+
   pageEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-weight:700;">🔄 Carregando CRM...</div>';
 
   const { data: usersData } = await getDB().from('users').select('*');
   (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
-
-  // Read filters
-  const filterUnit = document.getElementById('crm-filter-unit') ? document.getElementById('crm-filter-unit').value : '';
-  const filterShift = document.getElementById('crm-filter-shift') ? document.getElementById('crm-filter-shift').value : '';
-  const filterDateFrom = document.getElementById('crm-date-from') ? document.getElementById('crm-date-from').value : '';
-  const filterDateTo = document.getElementById('crm-date-to') ? document.getElementById('crm-date-to').value : '';
 
   // Apply filters
   let users = allUsers;
@@ -5727,17 +5728,18 @@ function loadAPIKeyStatus() {
 async function renderUsersPanel() {
   const pageEl = document.getElementById('page-users');
   if(!pageEl) return;
+
+  // Read filters BEFORE clearing innerHTML (elements get destroyed on innerHTML reset)
+  const filterDay   = document.getElementById('users-filter-day')    ? document.getElementById('users-filter-day').value    : '';
+  const filterShift = document.getElementById('users-filter-shift')  ? document.getElementById('users-filter-shift').value  : '';
+  const filterUnit  = document.getElementById('users-filter-unit')   ? document.getElementById('users-filter-unit').value   : '';
+  const searchQuery = document.getElementById('users-search-input')  ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
+
   pageEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-weight:700;">🔄 Carregando usuários...</div>';
 
   const { data: usersData } = await getDB().from('users').select('*');
   (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
-
-  // Read filters
-  const filterDay   = document.getElementById('users-filter-day')    ? document.getElementById('users-filter-day').value    : '';
-  const filterShift = document.getElementById('users-filter-shift')  ? document.getElementById('users-filter-shift').value  : '';
-  const filterUnit  = document.getElementById('users-filter-unit')   ? document.getElementById('users-filter-unit').value   : '';
-  const searchQuery = document.getElementById('users-search-input')  ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
 
   const todayStr = today();
   const units  = [...new Set(allUsers.map(u => u.unit))].sort();
