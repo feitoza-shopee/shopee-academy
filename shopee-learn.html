@@ -1737,7 +1737,6 @@ async function initData() {
             ]
           }
         ]
-        ]
       },
       {
         id:'mod_recebimento_soc',
@@ -6099,48 +6098,39 @@ function exportTodayToExcel() {
 // ============================================================
 // MONITORING PANEL
 // ============================================================
+// MONITORING PANEL
+// ============================================================
 function renderMonitoring() {
   const pageEl = document.getElementById('page-monitoring');
   if(!pageEl) return;
 
-  // Read filter values BEFORE clearing HTML
   const filterMod   = document.getElementById('mon-filter-mod')   ? document.getElementById('mon-filter-mod').value   : '';
   const filterSort  = document.getElementById('mon-filter-sort')  ? document.getElementById('mon-filter-sort').value  : 'errors';
   const filterLimit = document.getElementById('mon-filter-limit') ? parseInt(document.getElementById('mon-filter-limit').value) || 20 : 20;
 
-  // Load stats from localStorage
   let stats = {};
   try { stats = JSON.parse(localStorage.getItem('sa_q_errors') || '{}'); } catch(e) {}
 
-  // Build rows
   let rows = Object.entries(stats).map(([key, v]) => {
     const pct = v.attempts > 0 ? Math.round(v.errors / v.attempts * 100) : 0;
     return { key, ...v, pct };
   });
 
-  // Get unique modules from stats + from state.modules
   const allMods = [...new Set([
     ...rows.map(r => r.modTitle).filter(Boolean),
     ...state.modules.map(m => m.title)
   ])].sort();
 
-  // Apply module filter
   if(filterMod) rows = rows.filter(r => r.modTitle === filterMod);
-
-  // Sort
   if(filterSort === 'errors') rows.sort((a,b) => b.errors - a.errors);
   else if(filterSort === 'pct') rows.sort((a,b) => b.pct - a.pct);
   else if(filterSort === 'attempts') rows.sort((a,b) => b.attempts - a.attempts);
-
-  // Limit
   rows = rows.slice(0, filterLimit);
 
-  const totalTracked = Object.keys(stats).length;
-  const totalErrors  = Object.values(stats).reduce((a,v) => a + v.errors, 0);
-  const totalAttempts= Object.values(stats).reduce((a,v) => a + v.attempts, 0);
-  const globalPct    = totalAttempts > 0 ? Math.round(totalErrors / totalAttempts * 100) : 0;
+  const totalErrors   = Object.values(stats).reduce((a,v) => a + v.errors, 0);
+  const totalAttempts = Object.values(stats).reduce((a,v) => a + v.attempts, 0);
+  const globalPct     = totalAttempts > 0 ? Math.round(totalErrors / totalAttempts * 100) : 0;
 
-  // Color by error percentage
   function pctColor(p) {
     if(p >= 60) return '#E74C3C';
     if(p >= 35) return '#E67E22';
@@ -6148,98 +6138,110 @@ function renderMonitoring() {
     return '#2ECC71';
   }
 
-  pageEl.innerHTML = \`
-    <h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">📉 Monitoring</h2>
-    <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px;">Ranking de perguntas com maior índice de erro</p>
+  function buildRows() {
+    if(rows.length === 0) {
+      return '<div style="text-align:center;padding:40px 20px;color:var(--text2);">' +
+        '<div style="font-size:48px;margin-bottom:12px;">📊</div>' +
+        '<div style="font-weight:800;font-size:14px;margin-bottom:6px;">Nenhum dado ainda</div>' +
+        '<div style="font-size:12px;">Os erros serão registrados conforme os colaboradores respondem às perguntas.</div>' +
+        '</div>';
+    }
+    return rows.map(function(r, i) {
+      var barW = rows[0].pct > 0 ? Math.max(Math.round(r.pct / rows[0].pct * 100), 4) : 4;
+      var color = pctColor(r.pct);
+      var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' :
+        '<span style="font-size:12px;font-weight:900;color:var(--text2);">' + (i+1) + 'º</span>';
+      return '<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">' +
+        '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">' +
+          '<div style="font-size:18px;min-width:28px;text-align:center;padding-top:1px;">' + medal + '</div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:12px;font-weight:800;line-height:1.4;margin-bottom:3px;">' + r.q + '</div>' +
+            '<div style="font-size:10px;color:var(--text2);font-weight:700;">' + (r.modTitle||'—') + ' › ' + (r.lessonTitle||'—') + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;flex-shrink:0;">' +
+            '<div style="font-size:18px;font-weight:900;color:' + color + ';">' + r.pct + '%</div>' +
+            '<div style="font-size:10px;color:var(--text2);font-weight:700;">' + r.errors + ' erros / ' + r.attempts + ' tent.</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg);border-radius:100px;height:8px;overflow:hidden;">' +
+          '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + barW + '%;transition:width 0.5s;"></div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
 
-    <!-- KPI strip -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-      <div style="background:linear-gradient(135deg,#E74C3C,#C0392B);border-radius:14px;padding:14px;color:#fff;text-align:center;">
-        <div style="font-size:26px;font-weight:900;">\${totalErrors}</div>
-        <div style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;">Total Erros</div>
-      </div>
-      <div style="background:linear-gradient(135deg,#3498DB,#2980B9);border-radius:14px;padding:14px;color:#fff;text-align:center;">
-        <div style="font-size:26px;font-weight:900;">\${totalAttempts}</div>
-        <div style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;">Tentativas</div>
-      </div>
-      <div style="background:linear-gradient(135deg,#8E44AD,#9B59B6);border-radius:14px;padding:14px;color:#fff;text-align:center;">
-        <div style="font-size:26px;font-weight:900;">\${globalPct}%</div>
-        <div style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;">Taxa Erro Geral</div>
-      </div>
-    </div>
+  function modOptions() {
+    return allMods.map(function(m) {
+      return '<option value="' + m + '"' + (filterMod===m?' selected':'') + '>' + m + '</option>';
+    }).join('');
+  }
 
-    <!-- Filters -->
-    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;border:2px solid var(--border);box-shadow:var(--shadow);">
-      <div style="font-weight:900;font-size:13px;margin-bottom:12px;color:var(--shopee);">🔽 Filtros</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <div>
-          <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Módulo</label>
-          <select id="mon-filter-mod" onchange="renderMonitoring()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
-            <option value="">Todos</option>
-            \${allMods.map(m => \`<option value="\${m}"\${filterMod===m?' selected':''}>\${m}</option>\`).join('')}
-          </select>
-        </div>
-        <div>
-          <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Ordenar por</label>
-          <select id="mon-filter-sort" onchange="renderMonitoring()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
-            <option value="errors"\${filterSort==='errors'?' selected':''}>Qtd. Erros</option>
-            <option value="pct"\${filterSort==='pct'?' selected':''}>% de Erro</option>
-            <option value="attempts"\${filterSort==='attempts'?' selected':''}>Tentativas</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Exibir top</label>
-        <select id="mon-filter-limit" onchange="renderMonitoring()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
-          <option value="10"\${filterLimit===10?' selected':''}>Top 10</option>
-          <option value="20"\${filterLimit===20?' selected':''}>Top 20</option>
-          <option value="50"\${filterLimit===50?' selected':''}>Top 50</option>
-          <option value="999"\${filterLimit===999?' selected':''}>Todas</option>
-        </select>
-      </div>
-    </div>
+  pageEl.innerHTML =
+    '<h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">📉 Monitoring</h2>' +
+    '<p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px;">Ranking de perguntas com maior índice de erro</p>' +
 
-    <!-- Ranking list -->
-    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:80px;border:2px solid var(--border);box-shadow:var(--shadow);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        <div style="font-weight:900;font-size:14px;">🏴 Perguntas com Maior Erro
-          <span style="background:var(--shopee);color:#fff;font-size:11px;padding:2px 8px;border-radius:100px;margin-left:6px;">\${rows.length}</span>
-        </div>
-        <button onclick="if(confirm('Zerar todas as estatísticas de erro?')){localStorage.removeItem(\'sa_q_errors\');renderMonitoring();}" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:5px 10px;font-family:\'Nunito\',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">🗑️ Zerar</button>
-      </div>
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">' +
+      '<div style="background:linear-gradient(135deg,#E74C3C,#C0392B);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:26px;font-weight:900;">' + totalErrors + '</div>' +
+        '<div style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;">Total Erros</div>' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,#3498DB,#2980B9);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:26px;font-weight:900;">' + totalAttempts + '</div>' +
+        '<div style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;">Tentativas</div>' +
+      '</div>' +
+      '<div style="background:linear-gradient(135deg,#8E44AD,#9B59B6);border-radius:14px;padding:14px;color:#fff;text-align:center;">' +
+        '<div style="font-size:26px;font-weight:900;">' + globalPct + '%</div>' +
+        '<div style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;">Taxa Erro Geral</div>' +
+      '</div>' +
+    '</div>' +
 
-      \${rows.length === 0 ? \`
-        <div style="text-align:center;padding:40px 20px;color:var(--text2);">
-          <div style="font-size:48px;margin-bottom:12px;">📊</div>
-          <div style="font-weight:800;font-size:14px;margin-bottom:6px;">Nenhum dado ainda</div>
-          <div style="font-size:12px;">Os erros serão registrados conforme os colaboradores respondem às perguntas.</div>
-        </div>
-      \` : rows.map((r, i) => {
-        const barW = rows[0].pct > 0 ? Math.max(Math.round(r.pct / rows[0].pct * 100), 4) : 4;
-        const color = pctColor(r.pct);
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : \`<span style="font-size:12px;font-weight:900;color:var(--text2);">\${i+1}º</span>\`;
-        return \`
-          <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
-            <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">
-              <div style="font-size:18px;min-width:28px;text-align:center;padding-top:1px;">\${medal}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:12px;font-weight:800;line-height:1.4;margin-bottom:3px;">\${r.q}</div>
-                <div style="font-size:10px;color:var(--text2);font-weight:700;">\${r.modTitle || '—'} › \${r.lessonTitle || '—'}</div>
-              </div>
-              <div style="text-align:right;flex-shrink:0;">
-                <div style="font-size:18px;font-weight:900;color:\${color};">\${r.pct}%</div>
-                <div style="font-size:10px;color:var(--text2);font-weight:700;">\${r.errors} erros / \${r.attempts} tent.</div>
-              </div>
-            </div>
-            <div style="background:var(--bg);border-radius:100px;height:8px;overflow:hidden;">
-              <div style="height:100%;border-radius:100px;background:\${color};width:\${barW}%;transition:width 0.5s;"></div>
-            </div>
-          </div>
-        \`;
-      }).join('')}
-    </div>
-  \`;
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="font-weight:900;font-size:13px;margin-bottom:12px;color:var(--shopee);">🔽 Filtros</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
+        '<div>' +
+          '<label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Módulo</label>' +
+          '<select id="mon-filter-mod" onchange="renderMonitoring()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">' +
+            '<option value="">Todos</option>' + modOptions() +
+          '</select>' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Ordenar por</label>' +
+          '<select id="mon-filter-sort" onchange="renderMonitoring()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">' +
+            '<option value="errors"' + (filterSort==='errors'?' selected':'') + '>Qtd. Erros</option>' +
+            '<option value="pct"' + (filterSort==='pct'?' selected':'') + '>% de Erro</option>' +
+            '<option value="attempts"' + (filterSort==='attempts'?' selected':'') + '>Tentativas</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Exibir top</label>' +
+        '<select id="mon-filter-limit" onchange="renderMonitoring()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">' +
+          '<option value="10"' + (filterLimit===10?' selected':'') + '>Top 10</option>' +
+          '<option value="20"' + (filterLimit===20?' selected':'') + '>Top 20</option>' +
+          '<option value="50"' + (filterLimit===50?' selected':'') + '>Top 50</option>' +
+          '<option value="999"' + (filterLimit===999?' selected':'') + '>Todas</option>' +
+        '</select>' +
+      '</div>' +
+    '</div>' +
+
+    '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:80px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+        '<div style="font-weight:900;font-size:14px;">🏴 Perguntas com Maior Erro ' +
+          '<span style="background:var(--shopee);color:#fff;font-size:11px;padding:2px 8px;border-radius:100px;margin-left:6px;">' + rows.length + '</span>' +
+        '</div>' +
+        '<button onclick="clearMonitoringStats()" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:5px 10px;font-family:Nunito,sans-serif;font-size:11px;font-weight:800;cursor:pointer;">🗑️ Zerar</button>' +
+      '</div>' +
+      buildRows() +
+    '</div>';
 }
+
+function clearMonitoringStats() {
+  if(confirm('Zerar todas as estatísticas de erro?')) {
+    localStorage.removeItem('sa_q_errors');
+    renderMonitoring();
+  }
+}
+
 // ============================================================
 // BOOT
 // ============================================================
@@ -6282,6 +6284,8 @@ window.moveModule = moveModule;
 window.revokeAdmin = revokeAdmin;
 window.renderCRM = renderCRM;
 window.renderMonitoring = renderMonitoring;
+window.clearMonitoringStats = clearMonitoringStats;
+window.clearMonitoringStats = clearMonitoringStats;
 window.searchUser = searchUser;
 window.openModule = openModule;
 window.backToHome = backToHome;
