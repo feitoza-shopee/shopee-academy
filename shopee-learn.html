@@ -1274,7 +1274,7 @@ async function initData() {
   });
 
   // Modules DB — seed PDF modules if missing, preserve admin-created ones
-  const PDF_MODULES_VERSION = 'v7';
+  const PDF_MODULES_VERSION = 'v8';
   const seededVersion = localStorage.getItem('sa_modules_version');
   const needsReseed = seededVersion !== PDF_MODULES_VERSION;
 
@@ -3332,15 +3332,12 @@ async function initData() {
       },
     ];
 
-  if(needsReseed) {
-    // Merge: keep admin-created modules, replace/add PDF modules by id
+  // Always ensure all pdfModules are present (merge with any admin-created modules)
+  {
     const existing = JSON.parse(localStorage.getItem('sa_modules') || '[]');
     const adminOnly = existing.filter(m => !pdfModules.some(p => p.id === m.id));
     const merged = [...pdfModules, ...adminOnly];
     localStorage.setItem('sa_modules', JSON.stringify(merged));
-    localStorage.setItem('sa_modules_version', PDF_MODULES_VERSION);
-  } else if(!localStorage.getItem('sa_modules')) {
-    localStorage.setItem('sa_modules', JSON.stringify(pdfModules));
     localStorage.setItem('sa_modules_version', PDF_MODULES_VERSION);
   }
   state.modules = JSON.parse(localStorage.getItem('sa_modules'));
