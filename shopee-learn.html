@@ -4509,6 +4509,9 @@ async function renderCRM() {
       }).join('')) +
     '</div>' +
 
+    // MODULES PROGRESS PANEL
+    buildModulesCRM(users, allUsers) +
+
     // SEARCH & DELETE USER
     '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
       '<div style="font-weight:900;font-size:14px;margin-bottom:12px;color:var(--text);">🔍 Pesquisar Colaborador por CPF</div>' +
@@ -6239,6 +6242,122 @@ function clearMonitoringStats() {
   }
 }
 
+
+// ============================================================
+// CRM — MODULES PROGRESS PANEL
+// ============================================================
+function buildModulesCRM(users, allUsers) {
+  const totalUsers   = allUsers.length;
+  const filteredTotal = users.length;
+  if(!state.modules || state.modules.length === 0) return '';
+
+  function pct(n, d) { return d > 0 ? Math.round(n / d * 100) : 0; }
+  function bar(p, color) {
+    return '<div style="background:var(--bg);border-radius:100px;height:7px;overflow:hidden;margin-top:4px;">' +
+      '<div style="height:100%;border-radius:100px;background:' + color + ';width:' + p + '%;transition:width 0.5s;"></div>' +
+    '</div>';
+  }
+
+  var html = '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">' +
+    '<div style="font-weight:900;font-size:14px;margin-bottom:4px;color:var(--text);">📦 Progresso por Módulo</div>' +
+    '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:14px;">Clique em um módulo para ver o detalhamento por lição</div>';
+
+  state.modules.forEach(function(mod) {
+    var allLessonIds = mod.lessons.map(function(l) { return l.id; });
+    if(allLessonIds.length === 0) return;
+
+    // Users (filtered) who completed AT LEAST ONE lesson of this module
+    var usersInMod = users.filter(function(u) {
+      return allLessonIds.some(function(lid) { return (u.completedLessons||[]).includes(lid); });
+    });
+    // Users who completed ALL lessons of this module
+    var usersCompletedMod = users.filter(function(u) {
+      return allLessonIds.every(function(lid) { return (u.completedLessons||[]).includes(lid); });
+    });
+
+    var pctOfFiltered = pct(usersInMod.length, filteredTotal);
+    var pctOfTotal    = pct(usersInMod.length, totalUsers);
+    var pctCompleted  = pct(usersCompletedMod.length, filteredTotal);
+
+    var modColor = mod.color && mod.color.includes('#') ? mod.color.match(/#[0-9A-Fa-f]{6}/)[0] : 'var(--shopee)';
+
+    html += '<div style="border:1.5px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;">' +
+      // Module header — clickable
+      '<div onclick="toggleCRMLesson(\'crm-mod-' + mod.id + '\')" style="cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:10px;background:var(--bg);">' +
+        '<div style="width:38px;height:38px;border-radius:10px;background:' + mod.color + ';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">' + mod.icon + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + mod.title + '</div>' +
+          '<div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">' + mod.lessons.length + ' lição(ões)</div>' +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0;">' +
+          '<div style="font-size:15px;font-weight:900;color:' + modColor + ';">' + usersInMod.length + ' <span style="font-size:10px;font-weight:700;color:var(--text2);">colab.</span></div>' +
+          '<div style="font-size:10px;font-weight:700;color:var(--text2);">' + pctOfFiltered + '% do filtro · ' + pctOfTotal + '% total</div>' +
+        '</div>' +
+        '<div style="font-size:14px;color:var(--text2);margin-left:6px;">▼</div>' +
+      '</div>' +
+      // Progress bar for module
+      '<div style="padding:0 14px 10px;background:var(--bg);">' +
+        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);font-weight:700;margin-bottom:3px;">' +
+          '<span>Iniciaram o módulo</span><span>' + pctOfFiltered + '%</span>' +
+        '</div>' +
+        bar(pctOfFiltered, modColor) +
+        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);font-weight:700;margin-top:6px;margin-bottom:3px;">' +
+          '<span>Concluíram todas as lições</span><span>' + pctCompleted + '% (' + usersCompletedMod.length + ')</span>' +
+        '</div>' +
+        bar(pctCompleted, '#2ECC71') +
+      '</div>' +
+      // Lessons detail (collapsed by default)
+      '<div id="crm-mod-' + mod.id + '" style="display:none;">';
+
+    mod.lessons.forEach(function(les, li) {
+      var usersInLesson = users.filter(function(u) {
+        return (u.completedLessons||[]).includes(les.id);
+      });
+      var pctLesOfFiltered = pct(usersInLesson.length, filteredTotal);
+      var pctLesOfTotal    = pct(usersInLesson.length, totalUsers);
+      var pctLesOfMod      = pct(usersInLesson.length, usersInMod.length || 1);
+      var lesColor = li === 0 ? '#3498DB' : li === 1 ? '#9B59B6' : li === 2 ? '#E67E22' : '#1ABC9C';
+
+      html += '<div style="padding:10px 14px;border-top:1px solid var(--border);background:#fff;">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+          '<div style="background:' + lesColor + ';color:#fff;border-radius:6px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;">' + (li+1) + '</div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + les.title + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;flex-shrink:0;">' +
+            '<div style="font-size:14px;font-weight:900;color:' + lesColor + ';">' + usersInLesson.length + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:5px;">' +
+          '<div style="background:var(--bg);border-radius:6px;padding:5px 6px;text-align:center;">' +
+            '<div style="font-size:13px;font-weight:900;color:' + lesColor + ';">' + pctLesOfFiltered + '%</div>' +
+            '<div style="font-size:9px;color:var(--text2);font-weight:700;">do filtro</div>' +
+          '</div>' +
+          '<div style="background:var(--bg);border-radius:6px;padding:5px 6px;text-align:center;">' +
+            '<div style="font-size:13px;font-weight:900;color:' + lesColor + ';">' + pctLesOfTotal + '%</div>' +
+            '<div style="font-size:9px;color:var(--text2);font-weight:700;">do total</div>' +
+          '</div>' +
+          '<div style="background:var(--bg);border-radius:6px;padding:5px 6px;text-align:center;">' +
+            '<div style="font-size:13px;font-weight:900;color:' + lesColor + ';">' + pctLesOfMod + '%</div>' +
+            '<div style="font-size:9px;color:var(--text2);font-weight:700;">do módulo</div>' +
+          '</div>' +
+        '</div>' +
+        bar(pctLesOfFiltered, lesColor) +
+      '</div>';
+    });
+
+    html += '</div></div>'; // close lessons div + module card
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function toggleCRMLesson(id) {
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
 // ============================================================
 // BOOT
 // ============================================================
@@ -6280,6 +6399,7 @@ window.grantAdmin = grantAdmin;
 window.moveModule = moveModule;
 window.revokeAdmin = revokeAdmin;
 window.renderCRM = renderCRM;
+window.toggleCRMLesson = toggleCRMLesson;
 window.renderMonitoring = renderMonitoring;
 window.clearMonitoringStats = clearMonitoringStats;
 window.clearMonitoringStats = clearMonitoringStats;
