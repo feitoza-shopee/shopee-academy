@@ -1274,7 +1274,7 @@ async function initData() {
   });
 
   // Modules DB — seed PDF modules if missing, preserve admin-created ones
-  const PDF_MODULES_VERSION = 'v8';
+  const PDF_MODULES_VERSION = 'v9';
   const seededVersion = localStorage.getItem('sa_modules_version');
   const needsReseed = seededVersion !== PDF_MODULES_VERSION;
 
@@ -1503,6 +1503,236 @@ async function initData() {
                 ],
                 correctOrder:[1,2,0,3],
                 explanation:'Processo correto no PDA: Bipar a TO → Escolher o Unitizador (TO Type) → Bipar os pacotes um a um → Fechar quando atingir capacidade completa.'
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id:'mod_hse',
+        title:'HSE — Saúde, Segurança e Meio Ambiente',
+        description:'7 Regras de Ouro, EPIs, NRs, acidentes, ergonomia, equipamentos e emergências',
+        icon:'🦺',
+        color:'linear-gradient(135deg,#27AE60,#2ECC71)',
+        lessons:[
+          {
+            id:'mod_hse_l1',
+            title:'Fundamentos HSE — Regras, Acidentes e EPIs',
+            description:'7 Regras de Ouro, classificações de acidentes, EPIs, CIPA, Brigada e Matriz de Consequência',
+            xpReward:100,
+            questions:[
+              {
+                type:'multiple',
+                q:'Qual das alternativas corresponde à Regra de Ouro nº 1 do HSE da Shopee?',
+                options:[
+                  'Eu nunca me posiciono na área da doca durante a manobra de veículos',
+                  'Eu só começo a carga ou descarga após posicionar o calço nas rodas e guardar a chave do veículo',
+                  'Eu sempre cuido da minha segurança ao movimentar pacotes, pallets e gaiolas',
+                  'Eu nunca desativo dispositivos de segurança sem autorização'
+                ],
+                answer:1,
+                explanation:'Regra de Ouro nº 1: “Eu só começo a carga ou descarga após posicionar corretamente o calço nas rodas e guardar a chave do veículo.”'
+              },
+              {
+                type:'multiple',
+                q:'O que significa a sigla HSE?',
+                options:[
+                  'Health, Safety and Environment (Saúde, Segurança e Meio Ambiente)',
+                  'Human, Security and Equipment (Humano, Segurança e Equipamento)',
+                  'Health, System and Emergency (Saúde, Sistema e Emergência)',
+                  'Hazard, Safety and Environment (Perigo, Segurança e Meio Ambiente)'
+                ],
+                answer:0,
+                explanation:'HSE significa Health (Saúde), Safety (Segurança) e Environment (Meio Ambiente). É a área responsável pela saúde ocupacional e segurança no trabalho.'
+              },
+              {
+                type:'truefalse',
+                q:'Os membros da Brigada de Emergência são identificados por coletes vermelhos.',
+                answer:false,
+                explanation:'Incorreto. Os membros da Brigada de Emergência usam coletes VERDES. Os coletes ou braçadeiras vermelhas identificam os membros da CIPA.'
+              },
+              {
+                type:'multiple',
+                q:'O que são Acidentes de Trajeto?',
+                options:[
+                  'Acidentes que ocorrem dentro da empresa durante o trabalho',
+                  'Doenças causadas pelas condições do ambiente de trabalho',
+                  'Acidentes que ocorrem no trajeto entre a residência e o trabalho ou vice-versa',
+                  'Acidentes causados por equipamentos defeituosos na operação'
+                ],
+                answer:2,
+                explanation:'Acidentes de Trajeto são os que ocorrem no percurso entre a residência e o trabalho ou vice-versa. Exemplos: acidente de trânsito, queda de motocicleta, atropelamento.'
+              },
+              {
+                type:'truefalse',
+                q:'A empresa possui 1 dia útil para comunicar ao INSS o acidente de trabalho.',
+                answer:true,
+                explanation:'Correto. A empresa tem 1 dia útil para emitir a CAT (Comunicação de Acidente de Trabalho) ao INSS. A perda desse prazo pode descaracterizar a ocorrência.'
+              },
+              {
+                type:'multiple',
+                q:'Qual documento é necessário para emissão da CAT em caso de acidente de trajeto?',
+                options:[
+                  'Apenas o atestado médico com o CID',
+                  'Atestado médico com CID e Boletim de Ocorrência ou Carta a Próprio Punho',
+                  'Somente o Boletim de Ocorrência registrado na delegacia',
+                  'Laudo do departamento de RH e atestado médico'
+                ],
+                answer:1,
+                explanation:'Para acidentes de trajeto são necessários: Atestado Médico com CID e B.O. ou Carta a Próprio Punho. O B.O. pode ser registrado online, sem ir à delegacia.'
+              },
+              {
+                type:'multiple',
+                q:'Qual é a consequência de uma falta de BAIXO RISCO em primeira ocorrência, segundo a Matriz de Consequência?',
+                options:[
+                  'Suspensão de 1 a 5 dias',
+                  'Advertência por escrito',
+                  'Advertência verbal',
+                  'Demissão por justa causa'
+                ],
+                answer:2,
+                explanation:'Faltas de Baixo Risco (ex: usar adornos, correr nas instalações, arremessar pacotes) resultam em Advertência Verbal na 1ª ocorrência. Reincidência: advertência por escrito ou suspensão de 1 dia.'
+              },
+              {
+                type:'truefalse',
+                q:'Não usar EPIs obrigatórios é classificado como falta de Médio Risco na Matriz de Consequência.',
+                answer:true,
+                explanation:'Correto. Não usar EPIs obrigatórios é falta de Médio Risco. 1ª Ocorrência: Advertência por escrito. Reincidência: Suspensão de 1 a 5 dias.'
+              },
+              {
+                type:'multiple',
+                q:'O que é o Programa OPA no contexto do HSE?',
+                options:[
+                  'Um programa de ginástica laboral diária para os colaboradores',
+                  'Um sistema de registro de desvios de segurança presentes no ambiente de trabalho',
+                  'O plano de atendimento a emergências da empresa',
+                  'Um treinamento mensal obrigatório sobre normas regulamentadoras'
+                ],
+                answer:1,
+                explanation:'OPA (Observe, Planeje e Aja) é um programa para registrar desvios de segurança no ambiente de trabalho via QR Code. Também permite reconhecer/elogiar colegas.'
+              },
+              {
+                type:'order',
+                q:'Ordene corretamente como usar um extintor de incêndio:',
+                steps:[
+                  'Apontar o bico na direção da base do fogo',
+                  'Retirar o pino de segurança',
+                  'Apertar o gatilho e mover o jato em movimentos laterais',
+                  'Manter distância segura até apagar as chamas'
+                ],
+                correctOrder:[1,0,2,3],
+                explanation:'Sequência correta: Retirar o pino → Apontar o bico na base do fogo → Apertar o gatilho com movimentos laterais → Manter distância até apagar as chamas.'
+              }
+            ]
+          },
+          {
+            id:'mod_hse_l2',
+            title:'HSE — Equipamentos, NRs e Emergências',
+            description:'NR 11, NR 12, gaiolas, paleteiras, esteiras, sorter, ergonomia e primeiros socorros',
+            xpReward:100,
+            questions:[
+              {
+                type:'multiple',
+                q:'Conforme a NR 11, qual é o limite máximo de gaiolas VAZIAS que podem ser engatadas para movimentação?',
+                options:[
+                  '3 gaiolas',
+                  '7 gaiolas',
+                  '5 gaiolas',
+                  '10 gaiolas'
+                ],
+                answer:2,
+                explanation:'O engate máximo é de 5 gaiolas vazias por vez. Gaiolas cheias devem ser movimentadas uma por vez, sempre com luva de proteção anti-corte.'
+              },
+              {
+                type:'truefalse',
+                q:'Ao conduzir uma paleteira hidráulica, o operador deve estar posicionado à frente do timão e conduzi-la sempre puxando lateralmente.',
+                answer:true,
+                explanation:'Correto. O uso correto da paleteira hidráulica exige que o operador esteja à frente do timão, puxando lateralmente. Ao parar, o garfo deve ser sempre abaixado.'
+              },
+              {
+                type:'multiple',
+                q:'Qual ação é PROIBIDA ao trabalhar próximo às esteiras transportadoras (NR 12)?',
+                options:[
+                  'Usar touca para proteger o cabelo',
+                  'Inspecionar visualmente o equipamento antes de operar',
+                  'Tentar retirar pacotes encravados enquanto a esteira está em movimento',
+                  'Manter o colete refletivo fechado e sem partes soltas'
+                ],
+                answer:2,
+                explanation:'É estritamente proibido tentar retirar pacotes encravados com a esteira em movimento. Há risco crítico de acidente. O correto é acionar a liderança ou equipe de manutenção.'
+              },
+              {
+                type:'multiple',
+                q:'No Sorting NC (Pacotes Irregulares) do Sorter, qual é o limite de peso por pacote?',
+                options:[
+                  '20 kg',
+                  '15 kg',
+                  '8 kg',
+                  '12 kg'
+                ],
+                answer:3,
+                explanation:'No Sorting NC (pacotes irregulares), o limite é de 12 kg por pacote. Para pacotes regulares (M e G) no processamento normal, o limite é de 20 kg.'
+              },
+              {
+                type:'order',
+                q:'Ordene os passos para fechar uma saca no Sorter após a luz verde acender:',
+                steps:[
+                  'Puxar o suporte e retirar a saca',
+                  'Apertar 2 vezes o botão verde',
+                  'Colar as TOs no corpo da saca em lados opostos',
+                  'Puxar a porta de bloqueio para impedir queda de pacotes',
+                  'Pegar a TO na impressora'
+                ],
+                correctOrder:[1,3,4,0,2],
+                explanation:'Sequência: Apertar 2x botão verde → Puxar porta de bloqueio → Pegar TO na impressora → Puxar suporte e retirar a saca → Colar TOs em lados opostos.'
+              },
+              {
+                type:'truefalse',
+                q:'Pacotes com peso superior a 20 kg ou tamanho superior a 80 cm devem ser movimentados em dupla.',
+                answer:true,
+                explanation:'Correto. Segundo as normas de ergonomia: pacotes acima de 20 kg ou maiores que 80 cm exigem movimentação em dupla para prevenir lesões osteomusculares.'
+              },
+              {
+                type:'multiple',
+                q:'Em caso de crise convulsiva de um colega, qual é a atitude CORRETA?',
+                options:[
+                  'Conter os movimentos da pessoa para evitar que ela se machuque',
+                  'Colocar algo na boca da pessoa para evitar que ela morda a língua',
+                  'Afastar objetos perigosos e deitar a pessoa de lado após a crise',
+                  'Levantar a pessoa imediatamente e levá-la ao ambu latório'
+                ],
+                answer:2,
+                explanation:'Em crises convulsivas: afaste objetos perigosos, proteja a cabeça e deite de lado após a crise (posição de recuperação). Nunca contenha os movimentos nem coloque nada na boca. Acione o SAMU (192).'
+              },
+              {
+                type:'multiple',
+                q:'Qual classe de extintor deve ser usada em incêndio de equipamentos elétricos energizados?',
+                options:[
+                  'Classe A — materiais sólidos',
+                  'Classe B — combustíveis líquidos',
+                  'Classe C — equipamentos elétricos energizados',
+                  'Classe D — metais combustíveis'
+                ],
+                answer:2,
+                explanation:'O extintor Classe C é específico para equipamentos elétricos energizados. O extintor ABC cobre as classes A, B e C. Nunca use água em incêndios elétricos.'
+              },
+              {
+                type:'truefalse',
+                q:'A botoeira de parada de emergência das esteiras pode ser acionada para treinar o procedimento, mesmo sem situação de risco.',
+                answer:false,
+                explanation:'Incorreto. A botoeira ou corda de emergência deve ser acionada APENAS em situações reais de emergência. O reset após o acionamento deve ser feito pelo time de manutenção ou liderança.'
+              },
+              {
+                type:'multiple',
+                q:'Qual ação é PERMITIDA ao colaborador na área de docas com relação aos veículos?',
+                options:[
+                  'Auxiliar o motorista a estacionar nas docas',
+                  'Abrir ou fechar as portas do baú do caminhão',
+                  'Validar os dados do motorista no lugar do ajudante',
+                  'Registrar um OPA e comunicar a liderança ao identificar irregularidades'
+                ],
+                answer:3,
+                explanation:'É proibido auxiliar o motorista, abrir/fechar portas do baú e validar dados pelo ajudante. A ação correta ao identificar irregularidades é abrir um OPA e comunicar a liderança ou HSE.'
               }
             ]
           }
