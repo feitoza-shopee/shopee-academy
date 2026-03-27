@@ -4086,11 +4086,15 @@ async function finishQuiz() {
   const secs = elapsed%60;
   const accuracy = Math.round(q.correct/q.questions.length*100);
 
-  // Calculate XP
+  // Calculate XP — admins não pontuam no ranking
   let xpGained = lesson.xpReward;
   if(accuracy===100) xpGained = Math.round(xpGained * 1.5); // bonus
 
-  u.xp += xpGained;
+  if(!u.isAdmin) {
+    u.xp += xpGained;
+  } else {
+    xpGained = 0; // admin não acumula XP
+  }
   u.lives = q.lives;
 
   // Track time spent
@@ -4184,7 +4188,9 @@ async function renderRanking() {
   // Reload fresh from Supabase for real-time ranking
   const { data: usersData } = await getDB().from('users').select('*');
   (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
-  const allUsers = Object.values(state.users);
+
+  // Admins nunca aparecem no ranking
+  const allUsers = Object.values(state.users).filter(usr => !usr.isAdmin);
 
   let filtered;
   if(tab==='turno') filtered = allUsers.filter(usr => usr.unit===u.unit && usr.shift===u.shift);
@@ -4196,7 +4202,8 @@ async function renderRanking() {
   let html = '';
   filtered.forEach((usr, i) => {
     const pos = i+1;
-    const isMe = usr.id === u.id;
+    // Admin logado não é marcado como "me" no ranking (pois não aparece)
+    const isMe = !u.isAdmin && usr.id === u.id;
     const posClass = pos===1?'gold':pos===2?'silver':pos===3?'bronze':'other';
     const posEmoji = pos===1?'🥇':pos===2?'🥈':pos===3?'🥉':pos;
 
