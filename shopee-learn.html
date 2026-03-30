@@ -61,6 +61,7 @@ body {
   padding:24px;
   position:relative;
   overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
 }
 #screen-login::before {
   content:'';
@@ -87,6 +88,7 @@ body {
   box-shadow:0 24px 60px rgba(0,0,0,0.2);
   position:relative; z-index:1;
   animation: slideUp 0.5s ease;
+  margin:24px 0;
 }
 
 @keyframes slideUp {
@@ -3755,7 +3757,7 @@ async function handleLogin() {
     showScreen('screen-main');
     renderHome();
     switchPage('home');
-  }, 3000);
+  }, 5000);
 
   renderHome();
 }
