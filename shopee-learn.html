@@ -4967,8 +4967,32 @@ async function renderAdmin() {
 
 // ── render modules list inside admin ──────────────────────────
 function renderAdminModulesList() {
-  if(!state.modules.length) return '<p style="color:var(--text2);font-size:13px;font-weight:700;text-align:center;padding:16px 0">Nenhum módulo criado ainda.</p>';
-  return state.modules.map((mod, mi) => `
+  // For admin: also show the HSE Leader module (read-only view)
+  const hseSeparator = typeof HSE_MODULE !== 'undefined' ? `
+    <div style="background:linear-gradient(135deg,#E74C3C,#C0392B);border-radius:12px;padding:14px;border:2px solid #C0392B;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🦺</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:900;font-size:14px;color:#fff;">${HSE_MODULE.title}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.8);">Módulo exclusivo Líderes · ${HSE_MODULE.lessons.length} lição(ões)</div>
+        </div>
+        <span style="background:rgba(255,255,255,0.25);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:100px;">HSE</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${HSE_MODULE.lessons.map((les, li) => `
+          <div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,0.2);">
+            <span style="font-size:12px;font-weight:900;color:#fff;min-width:20px">${li+1}.</span>
+            <span style="flex:1;font-size:13px;font-weight:700;color:#fff;">${les.title}</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.8);">${les.questions.length}Q</span>
+            <button onclick="adminOpenHSELesson(${li})" style="background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.5);color:#fff;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;">✏️ Editar</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  if(!state.modules.length) return hseSeparator + '<p style="color:var(--text2);font-size:13px;font-weight:700;text-align:center;padding:16px 0">Nenhum módulo regular criado ainda.</p>';
+  return hseSeparator + state.modules.map((mod, mi) => `
     <div style="background:var(--bg);border-radius:12px;padding:14px;border:2px solid var(--border);">
       <!-- Module header -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -5119,6 +5143,9 @@ function adminOpenLesson(modId, lessonId) {
 
       <div style="padding:20px;">
         <!-- existing questions -->
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button onclick="adminClearAllQuestions('${modId}','${lessonId}')" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;">🗑️ Limpar Todas</button>
+        </div>
         <div id="q-list-${lessonId}" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
           ${renderQuestionList(mod, lesson)}
         </div>
@@ -6067,12 +6094,13 @@ async function renderUsersPanel() {
   const pageEl = document.getElementById('page-users');
   if(!pageEl) return;
 
-  // Read filters BEFORE clearing innerHTML (elements get destroyed on innerHTML reset)
-  const filterDay      = document.getElementById('users-filter-day')      ? document.getElementById('users-filter-day').value      : '';
-  const filterShift    = document.getElementById('users-filter-shift')    ? document.getElementById('users-filter-shift').value    : '';
-  const filterUnit     = document.getElementById('users-filter-unit')     ? document.getElementById('users-filter-unit').value     : '';
-  const filterPosition = document.getElementById('users-filter-position') ? document.getElementById('users-filter-position').value : '';
-  const searchQuery    = document.getElementById('users-search-input')    ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
+  // Read filters BEFORE clearing innerHTML
+  const filterDateFrom = document.getElementById('users-filter-date-from') ? document.getElementById('users-filter-date-from').value : '';
+  const filterDateTo   = document.getElementById('users-filter-date-to')   ? document.getElementById('users-filter-date-to').value   : '';
+  const filterShift    = document.getElementById('users-filter-shift')     ? document.getElementById('users-filter-shift').value     : '';
+  const filterUnit     = document.getElementById('users-filter-unit')      ? document.getElementById('users-filter-unit').value      : '';
+  const filterPosition = document.getElementById('users-filter-position')  ? document.getElementById('users-filter-position').value  : '';
+  const searchQuery    = document.getElementById('users-search-input')     ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
 
   pageEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-weight:700;">🔄 Carregando usuários...</div>';
 
@@ -6080,13 +6108,35 @@ async function renderUsersPanel() {
   (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
 
-  const todayStr = today();
+  const todayStr   = today();
   const units  = [...new Set(allUsers.map(u => u.unit))].sort();
   const shifts = ['T1','T2','T3','ADM'];
 
-  // Apply filters
+  // Build period label for header
+  let periodLabel = '';
+  if(filterDateFrom && filterDateTo)    periodLabel = filterDateFrom + ' a ' + filterDateTo;
+  else if(filterDateFrom)               periodLabel = 'a partir de ' + filterDateFrom;
+  else if(filterDateTo)                 periodLabel = 'até ' + filterDateTo;
+  else                                  periodLabel = todayStr;
+
+  // Apply filters to "access" list (period-sensitive)
+  let accessFiltered = allUsers;
+  if(filterDateFrom) accessFiltered = accessFiltered.filter(u => u.lastActive >= filterDateFrom);
+  if(filterDateTo)   accessFiltered = accessFiltered.filter(u => u.lastActive <= filterDateTo);
+  if(!filterDateFrom && !filterDateTo)  accessFiltered = allUsers.filter(u => u.lastActive === todayStr);
+  if(filterShift)    accessFiltered = accessFiltered.filter(u => u.shift    === filterShift);
+  if(filterUnit)     accessFiltered = accessFiltered.filter(u => u.unit     === filterUnit);
+  if(filterPosition) accessFiltered = accessFiltered.filter(u => u.position === filterPosition);
+  if(searchQuery)    accessFiltered = accessFiltered.filter(u =>
+    u.name.toLowerCase().includes(searchQuery) ||
+    u.id.toLowerCase().includes(searchQuery) ||
+    (u.nickname||'').toLowerCase().includes(searchQuery)
+  );
+
+  // Apply same filters to full user list
   let filtered = allUsers;
-  if(filterDay)      filtered = filtered.filter(u => u.lastActive === filterDay);
+  if(filterDateFrom) filtered = filtered.filter(u => u.lastActive >= filterDateFrom);
+  if(filterDateTo)   filtered = filtered.filter(u => u.lastActive <= filterDateTo);
   if(filterShift)    filtered = filtered.filter(u => u.shift    === filterShift);
   if(filterUnit)     filtered = filtered.filter(u => u.unit     === filterUnit);
   if(filterPosition) filtered = filtered.filter(u => u.position === filterPosition);
@@ -6096,8 +6146,7 @@ async function renderUsersPanel() {
     (u.nickname||'').toLowerCase().includes(searchQuery)
   );
 
-  // Today's accessors
-  const todayUsers = allUsers.filter(u => u.lastActive === todayStr);
+  const hasActiveFilter = filterDateFrom || filterDateTo || filterShift || filterUnit || filterPosition || searchQuery;
   const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
 
   const userRow = (u) => {
@@ -6109,7 +6158,7 @@ async function renderUsersPanel() {
       <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}${u.nickname?' <span style="font-size:10px;color:var(--shopee);font-weight:700;">("'+u.nickname+'")</span>':''}</div>
-        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · ${u.shift}${u.position?' · <span style=\'color:var(--shopee)\'>'+u.position+'</span>':''}</div>
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · ${u.shift}${u.position?' · <span style="color:var(--shopee)">'+u.position+'</span>':''}</div>
         <div style="font-size:10px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">
           <span style="color:var(--gold);font-weight:700;">⭐${u.xp||0}</span>
           <span style="color:var(--shopee);font-weight:700;">🔥${u.streak||0}</span>
@@ -6141,7 +6190,10 @@ async function renderUsersPanel() {
 
     <!-- FILTERS -->
     <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;border:2px solid var(--border);box-shadow:var(--shadow);">
-      <div style="font-weight:900;font-size:13px;margin-bottom:12px;color:var(--shopee);">🔽 Filtros</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-weight:900;font-size:13px;color:var(--shopee);">🔽 Filtros</div>
+        <button onclick="clearUsersFilters()" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:5px 10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">🧹 Limpar Filtros</button>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div>
           <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Unidade</label>
@@ -6158,7 +6210,7 @@ async function renderUsersPanel() {
           </select>
         </div>
       </div>
-      <div>
+      <div style="margin-bottom:8px;">
         <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Cargo</label>
         <select id="users-filter-position" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
           <option value="">Todos</option>
@@ -6166,30 +6218,39 @@ async function renderUsersPanel() {
         </select>
       </div>
       <div>
-        <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Filtrar por Dia (Último acesso)</label>
-        <input type="date" id="users-filter-day" value="${filterDay}" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;" />
+        <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Filtrar por Período (Último acesso)</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--text2);display:block;margin-bottom:3px;">De</label>
+            <input type="date" id="users-filter-date-from" value="${filterDateFrom}" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;" />
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--text2);display:block;margin-bottom:3px;">Até</label>
+            <input type="date" id="users-filter-date-to" value="${filterDateTo}" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;" />
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- TODAY'S ACCESSES HIGHLIGHT + EXCEL EXPORT -->
+    <!-- ACCESS HIGHLIGHT + EXCEL EXPORT -->
     <div style="background:linear-gradient(135deg,#27AE60,#2ECC71);border-radius:16px;padding:16px;margin-bottom:14px;color:#fff;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div>
-          <div style="font-weight:900;font-size:15px;">🟢 Acessaram Hoje — ${todayStr}</div>
-          <div style="font-size:28px;font-weight:900;margin-top:2px;">${todayUsers.length} <span style="font-size:14px;opacity:0.85;">colaborador(es)</span></div>
+          <div style="font-weight:900;font-size:15px;">🟢 Acessos — ${periodLabel}</div>
+          <div style="font-size:28px;font-weight:900;margin-top:2px;">${accessFiltered.length} <span style="font-size:14px;opacity:0.85;">colaborador(es)</span></div>
         </div>
         <button onclick="exportTodayToExcel()" style="background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.6);color:#fff;border-radius:10px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
           📥 Exportar Excel
         </button>
       </div>
       <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-top:8px;">
-        ${todayUsers.length === 0
-          ? '<div style="font-size:13px;opacity:0.85;text-align:center;padding:10px;">Nenhum acesso registrado hoje ainda.</div>'
-          : todayUsers.map(u => `<div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+        ${accessFiltered.length === 0
+          ? '<div style="font-size:13px;opacity:0.85;text-align:center;padding:10px;">Nenhum acesso encontrado para este período.</div>'
+          : accessFiltered.sort((a,b) => b.lastActive.localeCompare(a.lastActive)).map(u => `<div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
               <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
               <div style="flex:1;">
                 <div style="font-size:12px;font-weight:800;">${u.name}</div>
-                <div style="font-size:10px;opacity:0.85;">${u.id} · ${u.unit} · ${u.shift}</div>
+                <div style="font-size:10px;opacity:0.85;">${u.id} · ${u.unit} · ${u.shift}${u.position?' · '+u.position:''} · ${u.lastActive}</div>
               </div>
               <div style="font-size:11px;font-weight:700;opacity:0.9;">⭐${u.xp||0}</div>
             </div>`).join('')
@@ -6203,15 +6264,26 @@ async function renderUsersPanel() {
         <div style="font-weight:900;font-size:14px;color:var(--text);">
           👤 Todos os Usuários
           <span style="background:var(--shopee);color:#fff;font-size:11px;padding:2px 8px;border-radius:100px;margin-left:6px;">${filtered.length}</span>
-          ${(filterDay||filterShift||filterUnit||searchQuery) ? '<span style="font-size:11px;color:var(--text2);font-weight:600;margin-left:6px;">(filtrado)</span>' : ''}
+          ${hasActiveFilter ? '<span style="font-size:11px;color:var(--text2);font-weight:600;margin-left:6px;">(filtrado)</span>' : ''}
         </div>
       </div>
       ${filtered.length === 0
-        ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:20px;">Nenhum usuário encontrado.</p>'
+        ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:20px;">Nenhum usuário encontrado com os filtros ativos.</p>'
         : filtered.sort((a,b) => a.name.localeCompare(b.name)).map(userRow).join('')
       }
     </div>
   `;
+}
+
+function clearUsersFilters() {
+  // Reset all filter elements then re-render
+  ['users-filter-date-from','users-filter-date-to','users-filter-shift','users-filter-unit','users-filter-position'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  const sq = document.getElementById('users-search-input');
+  if(sq) sq.value = '';
+  renderUsersPanel();
 }
 
 async function deleteUserFromPanel(uid, name) {
@@ -6228,15 +6300,17 @@ function exportTodayToExcel() {
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
   const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
 
-  const filterDay      = document.getElementById('users-filter-day')      ? document.getElementById('users-filter-day').value      : '';
-  const filterShift    = document.getElementById('users-filter-shift')    ? document.getElementById('users-filter-shift').value    : '';
-  const filterUnit     = document.getElementById('users-filter-unit')     ? document.getElementById('users-filter-unit').value     : '';
-  const filterPosition = document.getElementById('users-filter-position') ? document.getElementById('users-filter-position').value : '';
-  const searchQuery    = document.getElementById('users-search-input')    ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
+  const filterDateFrom = document.getElementById('users-filter-date-from') ? document.getElementById('users-filter-date-from').value : '';
+  const filterDateTo   = document.getElementById('users-filter-date-to')   ? document.getElementById('users-filter-date-to').value   : '';
+  const filterShift    = document.getElementById('users-filter-shift')     ? document.getElementById('users-filter-shift').value     : '';
+  const filterUnit     = document.getElementById('users-filter-unit')      ? document.getElementById('users-filter-unit').value      : '';
+  const filterPosition = document.getElementById('users-filter-position')  ? document.getElementById('users-filter-position').value  : '';
+  const searchQuery    = document.getElementById('users-search-input')     ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
 
   let exportUsers = allUsers;
-  if(filterDay)      exportUsers = exportUsers.filter(u => u.lastActive === filterDay);
-  else               exportUsers = exportUsers.filter(u => u.lastActive === todayStr);
+  if(filterDateFrom) exportUsers = exportUsers.filter(u => u.lastActive >= filterDateFrom);
+  if(filterDateTo)   exportUsers = exportUsers.filter(u => u.lastActive <= filterDateTo);
+  if(!filterDateFrom && !filterDateTo) exportUsers = exportUsers.filter(u => u.lastActive === todayStr);
   if(filterShift)    exportUsers = exportUsers.filter(u => u.shift    === filterShift);
   if(filterUnit)     exportUsers = exportUsers.filter(u => u.unit     === filterUnit);
   if(filterPosition) exportUsers = exportUsers.filter(u => u.position === filterPosition);
@@ -6251,7 +6325,12 @@ function exportTodayToExcel() {
     return;
   }
 
-  const exportDate = filterDay || todayStr;
+  let periodLabel = '';
+  if(filterDateFrom && filterDateTo) periodLabel = filterDateFrom + '_a_' + filterDateTo;
+  else if(filterDateFrom) periodLabel = 'a-partir-de_' + filterDateFrom;
+  else if(filterDateTo)   periodLabel = 'ate_' + filterDateTo;
+  else                    periodLabel = todayStr;
+
   const headers = ['Nome','Apelido','CPF','Unidade','Turno','Cargo','XP','Streak','Lições Concluídas','Total Lições','Progresso (%)','Último Acesso'];
   const rows = exportUsers.map(u => {
     const done = (u.completedLessons||[]).length;
@@ -6268,7 +6347,7 @@ function exportTodayToExcel() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = 'exportacao_' + exportDate + '.csv';
+  a.download = 'exportacao_' + periodLabel + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -6913,7 +6992,104 @@ async function renderRankingByPosition() {
   container.innerHTML = html;
 }
 
-window.submitProfileUpdate   = submitProfileUpdate;
+// ── Admin: open HSE lesson for editing ───────────────────────────────────
+function adminOpenHSELesson(lessonIdx) {
+  const mod    = HSE_MODULE;
+  const lesson = mod.lessons[lessonIdx];
+  if(!mod || !lesson) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'q-editor-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;';
+
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:560px;margin:auto;box-shadow:0 24px 60px rgba(0,0,0,0.25);overflow:hidden;">
+      <div style="background:linear-gradient(135deg,#E74C3C,#C0392B);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:16px;font-weight:900;color:#fff;">🦺 ${lesson.title}</div>
+          <div id="hse-header-count-${lessonIdx}" style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;">${lesson.questions.length} pergunta(s) · ${lesson.xpReward} XP</div>
+        </div>
+        <button onclick="document.getElementById('q-editor-overlay').remove()" style="background:rgba(255,255,255,0.2);border:none;border-radius:8px;padding:8px 12px;color:#fff;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;">✕ Fechar</button>
+      </div>
+      <div style="padding:16px;">
+        <!-- Clear All Button -->
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button onclick="adminClearAllQuestions_HSE(${lessonIdx})" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;">🗑️ Limpar Todas as Perguntas</button>
+        </div>
+        <div id="hse-q-list-${lessonIdx}">
+          ${renderHSEQuestionList(lessonIdx)}
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function renderHSEQuestionList(lessonIdx) {
+  const lesson = HSE_MODULE.lessons[lessonIdx];
+  if(!lesson || !lesson.questions.length) return '<div style="font-size:12px;color:var(--text2);text-align:center;padding:8px 0;">Nenhuma pergunta ainda.</div>';
+  return lesson.questions.map((q, qi) => `
+    <div style="background:var(--bg);border-radius:10px;padding:10px 12px;border:1.5px solid var(--border);display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+      <div style="background:var(--shopee);color:#fff;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:900;flex-shrink:0;margin-top:1px;">${qi+1}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:700;line-height:1.4;">${q.q}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px;">${q.type==='multiple'?'Múltipla Escolha':q.type==='truefalse'?'V ou F':'Ordenar'}</div>
+      </div>
+      <button onclick="adminDeleteHSEQuestion(${lessonIdx},${qi})" style="flex-shrink:0;background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:6px;padding:4px 7px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;">🗑️</button>
+    </div>
+  `).join('');
+}
+
+function adminDeleteHSEQuestion(lessonIdx, qi) {
+  const lesson = HSE_MODULE.lessons[lessonIdx];
+  if(!lesson) return;
+  if(!confirm('Excluir esta pergunta do módulo HSE?')) return;
+  lesson.questions.splice(qi, 1);
+  const listEl = document.getElementById('hse-q-list-' + lessonIdx);
+  if(listEl) listEl.innerHTML = renderHSEQuestionList(lessonIdx);
+  const countEl = document.getElementById('hse-header-count-' + lessonIdx);
+  if(countEl) countEl.textContent = lesson.questions.length + ' pergunta(s) · ' + lesson.xpReward + ' XP';
+  document.getElementById('adm-modules-list').innerHTML = renderAdminModulesList();
+  showToast('🗑️ Pergunta HSE excluída.');
+}
+
+function adminClearAllQuestions_HSE(lessonIdx) {
+  const lesson = HSE_MODULE.lessons[lessonIdx];
+  if(!lesson) return;
+  if(!confirm('Limpar TODAS as ' + lesson.questions.length + ' perguntas desta lição HSE? Esta ação não pode ser desfeita.')) return;
+  lesson.questions = [];
+  const listEl = document.getElementById('hse-q-list-' + lessonIdx);
+  if(listEl) listEl.innerHTML = renderHSEQuestionList(lessonIdx);
+  const countEl = document.getElementById('hse-header-count-' + lessonIdx);
+  if(countEl) countEl.textContent = '0 pergunta(s) · ' + lesson.xpReward + ' XP';
+  document.getElementById('adm-modules-list').innerHTML = renderAdminModulesList();
+  showToast('🧹 Todas as perguntas HSE foram removidas.');
+}
+
+// ── Clear all questions for a regular lesson ─────────────────────────────
+function adminClearAllQuestions(modId, lessonId) {
+  const mod    = state.modules.find(m => m.id === modId);
+  const lesson = mod && mod.lessons.find(l => l.id === lessonId);
+  if(!mod || !lesson) return;
+  if(!confirm('Limpar TODAS as ' + lesson.questions.length + ' perguntas desta lição? Esta ação não pode ser desfeita.')) return;
+  lesson.questions = [];
+  saveModules();
+  const listEl = document.getElementById('q-list-' + lessonId);
+  if(listEl) listEl.innerHTML = renderQuestionList(mod, lesson);
+  const countEl = document.getElementById('q-header-count-' + lessonId);
+  if(countEl) countEl.textContent = '0 pergunta(s) · ' + lesson.xpReward + ' XP';
+  document.getElementById('adm-modules-list').innerHTML = renderAdminModulesList();
+  renderHome();
+  showToast('🧹 Todas as perguntas foram removidas.');
+}
+
+window.submitProfileUpdate      = submitProfileUpdate;
+window.clearUsersFilters        = clearUsersFilters;
+window.adminOpenHSELesson       = adminOpenHSELesson;
+window.adminDeleteHSEQuestion   = adminDeleteHSEQuestion;
+window.adminClearAllQuestions_HSE = adminClearAllQuestions_HSE;
+window.adminClearAllQuestions   = adminClearAllQuestions;
+window.renderHSEQuestionList    = renderHSEQuestionList;
 window.showNoLivesModal      = showNoLivesModal;
 window.closeNoLivesModal     = closeNoLivesModal;
 window.hasLives              = hasLives;
