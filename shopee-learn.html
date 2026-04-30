@@ -1150,6 +1150,19 @@ body {
           <option value="ADM">ADM</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>Cargo</label>
+        <select id="reg-position">
+          <option value="">Selecione seu cargo</option>
+          <option value="Log I">Log I</option>
+          <option value="Log II">Log II</option>
+          <option value="Assit">Assit</option>
+          <option value="Líder">Líder</option>
+          <option value="Analyst">Analyst</option>
+          <option value="Superv.">Superv.</option>
+          <option value="Coord.">Coord.</option>
+        </select>
+      </div>
       <button class="btn-primary" id="btn-register">✅ Criar Conta</button>
       <button type="button" onclick="showLogin()" style="width:100%;margin-top:10px;padding:14px;background:none;border:2.5px solid var(--border);border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;color:var(--text2);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--shopee)'" onmouseout="this.style.borderColor='var(--border)'">
         ← Já tenho conta
@@ -1198,11 +1211,13 @@ body {
     <h2 class="section-title" style="font-size:20px; margin-bottom:4px;">🏆 Ranking</h2>
     <p style="font-size:13px; color:var(--text2); font-weight:600; margin-bottom:16px;">Veja como você está entre os colegas</p>
     <div class="tabs-row">
-      <button class="tab-btn active" onclick="switchRankingTab('turno')">Meu Turno</button>
-      <button class="tab-btn" onclick="switchRankingTab('unidade')">Minha Unidade</button>
-      <button class="tab-btn" onclick="switchRankingTab('nacional')">Nacional</button>
+      <button class="tab-btn active" id="rank-tab-turno" onclick="switchRankingTab('turno')">Meu Turno</button>
+      <button class="tab-btn" id="rank-tab-unidade" onclick="switchRankingTab('unidade')">Minha Unidade</button>
+      <button class="tab-btn" id="rank-tab-nacional" onclick="switchRankingTab('nacional')">Nacional</button>
+      <button class="tab-btn" id="rank-tab-cargo" onclick="switchRankingTab('cargo')">Por Cargo</button>
     </div>
     <div id="ranking-list" class="ranking-list"></div>
+    <div id="ranking-by-position" style="display:none;"></div>
   </div>
 
   <div id="page-profile" class="page-content hidden" style="overflow-y:auto;max-height:calc(100vh - 160px);">
@@ -1331,9 +1346,10 @@ function rowToUser(row) {
     password: row.password,
     unit: row.unit,
     shift: row.shift,
+    position: row.position || '',
     xp: row.xp || 0,
     streak: row.streak || 0,
-    lives: row.lives || 5,
+    lives: (row.lives !== undefined && row.lives !== null) ? row.lives : 5,
     lastActive: row.last_active || today(),
     completedLessons: (() => { try { return JSON.parse(row.completed_lessons || '[]'); } catch(e) { return []; } })(),
     isAdmin: row.is_admin || false,
@@ -3450,9 +3466,10 @@ async function saveUser(user) {
     password: user.password,
     unit: user.unit,
     shift: user.shift,
+    position: user.position || '',
     xp: user.xp || 0,
     streak: user.streak || 0,
-    lives: user.lives || 5,
+    lives: (user.lives !== undefined && user.lives !== null) ? user.lives : 5,
     last_active: user.lastActive || today(),
     completed_lessons: JSON.stringify(user.completedLessons || []),
     is_admin: user.isAdmin || false,
@@ -3623,10 +3640,11 @@ async function handleRegister() {
   const pass2 = document.getElementById('reg-pass2').value;
   const unit = document.getElementById('reg-unit').value;
   const shift = document.getElementById('reg-shift').value;
+  const position = document.getElementById('reg-position').value;
   const errEl = document.getElementById('login-error');
 
-  if(!name||!cpf||!pass||!pass2||!unit||!shift) {
-    errEl.textContent='Preencha todos os campos.';
+  if(!name||!cpf||!pass||!pass2||!unit||!shift||!position) {
+    errEl.textContent='Preencha todos os campos, incluindo o Cargo.';
     errEl.classList.remove('hidden'); return;
   }
   if(!validarCPF(cpf)) {
@@ -3657,13 +3675,13 @@ async function handleRegister() {
   }
 
   const newUser = {
-    id:cpf, name, nickname: nickname || name.split(' ')[0], password:pass, unit, shift,
+    id:cpf, name, nickname: nickname || name.split(' ')[0], password:pass, unit, shift, position,
     xp:0, streak:0, lives:5, lastActive:today(),
     completedLessons:[], isAdmin:false, totalAccesses:0
   };
 
   const { error } = await getDB().from('users').insert({
-    id:cpf, name, nickname: nickname || name.split(' ')[0], password:pass, unit, shift,
+    id:cpf, name, nickname: nickname || name.split(' ')[0], password:pass, unit, shift, position,
     xp:0, streak:0, lives:5, last_active:today(),
     completed_lessons:'[]', is_admin:false, total_accesses:0
   });
@@ -3731,16 +3749,21 @@ async function handleLogin() {
     if(diff > 1) user.streak = 1;
     else user.streak++;
     user.lastActive = todayDate;
+    // Renew lives fully on new day
+    user.lives = 5;
   }
-
-  // Refill lives
-  user.lives = Math.min(5, (user.lives||0) + 2);
 
   await saveUser(user);
   state.currentUser = user;
   state.modules = JSON.parse(localStorage.getItem('sa_modules'));
 
   hideLoading();
+
+  // Check if user needs profile update (missing position for existing users)
+  if(!user.position) {
+    showProfileUpdateModal(user);
+    return;
+  }
 
   // Show welcome screen for 3 seconds then go to main
   showScreen('screen-welcome');
@@ -3751,6 +3774,15 @@ async function handleLogin() {
     document.getElementById('nav-crm').classList.remove('hidden');
     document.getElementById('nav-users').classList.remove('hidden');
     document.getElementById('nav-monitoring').classList.remove('hidden');
+  }
+
+  if(user.position === 'Líder' && !user.isAdmin) {
+    setTimeout(function() {
+      updateLeaderNavStats();
+      renderLeaderHome();
+      showScreen('screen-leader');
+    }, 5000);
+    return;
   }
 
   setTimeout(function() {
@@ -3774,7 +3806,7 @@ function renderHome() {
   let html = `
     <div class="greeting">
       <h2>Olá, ${u.nickname || u.name.split(' ')[0]}! 👋</h2>
-      <p>${u.unit} · Turno ${u.shift}</p>
+      <p>${u.unit} · Turno ${u.shift}${u.position ? ' · ' + u.position : ''}</p>
     </div>
     <div class="streak-banner">
       <div class="streak-icon">🔥</div>
@@ -4245,6 +4277,13 @@ function closeQuiz() {
 }
 
 function goHome() {
+  const u = state.currentUser;
+  if(u && u.position === 'Líder' && !u.isAdmin) {
+    updateLeaderNavStats();
+    renderLeaderHome();
+    showScreen('screen-leader');
+    return;
+  }
   showScreen('screen-main');
   renderHome();
   switchPage('home');
@@ -4278,9 +4317,22 @@ function launchConfetti() {
 // ============================================================
 function switchRankingTab(tab) {
   state.rankingTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  renderRanking();
+  // Update tab button active states by ID
+  ['turno','unidade','nacional','cargo'].forEach(t => {
+    const btn = document.getElementById('rank-tab-'+t);
+    if(btn) btn.classList.toggle('active', t === tab);
+  });
+  const listEl = document.getElementById('ranking-list');
+  const posEl = document.getElementById('ranking-by-position');
+  if(tab === 'cargo') {
+    if(listEl) listEl.style.display = 'none';
+    if(posEl) posEl.style.display = 'block';
+    renderRankingByPosition();
+  } else {
+    if(listEl) listEl.style.display = '';
+    if(posEl) posEl.style.display = 'none';
+    renderRanking();
+  }
 }
 
 async function renderRanking() {
@@ -4314,7 +4366,7 @@ async function renderRanking() {
         <div class="rank-avatar">${usr.name.charAt(0)}</div>
         <div class="rank-info">
           <h4>${usr.name}${isMe?' (você)':''}</h4>
-          <p>${usr.unit} · ${usr.shift} · 🔥${usr.streak||0} dias</p>
+          <p>${usr.unit} · ${usr.shift}${usr.position?' · '+usr.position:''} · 🔥${usr.streak||0} dias</p>
         </div>
         <div class="rank-xp">⭐ ${(usr.xp||0).toLocaleString()}</div>
       </div>
@@ -6008,10 +6060,11 @@ async function renderUsersPanel() {
   if(!pageEl) return;
 
   // Read filters BEFORE clearing innerHTML (elements get destroyed on innerHTML reset)
-  const filterDay   = document.getElementById('users-filter-day')    ? document.getElementById('users-filter-day').value    : '';
-  const filterShift = document.getElementById('users-filter-shift')  ? document.getElementById('users-filter-shift').value  : '';
-  const filterUnit  = document.getElementById('users-filter-unit')   ? document.getElementById('users-filter-unit').value   : '';
-  const searchQuery = document.getElementById('users-search-input')  ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
+  const filterDay      = document.getElementById('users-filter-day')       ? document.getElementById('users-filter-day').value       : '';
+  const filterShift    = document.getElementById('users-filter-shift')     ? document.getElementById('users-filter-shift').value     : '';
+  const filterUnit     = document.getElementById('users-filter-unit')      ? document.getElementById('users-filter-unit').value      : '';
+  const filterPosition = document.getElementById('users-filter-position')  ? document.getElementById('users-filter-position').value  : '';
+  const searchQuery    = document.getElementById('users-search-input')     ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
 
   pageEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-weight:700;">🔄 Carregando usuários...</div>';
 
@@ -6025,10 +6078,11 @@ async function renderUsersPanel() {
 
   // Apply filters
   let filtered = allUsers;
-  if(filterDay)   filtered = filtered.filter(u => u.lastActive === filterDay);
-  if(filterShift) filtered = filtered.filter(u => u.shift === filterShift);
-  if(filterUnit)  filtered = filtered.filter(u => u.unit  === filterUnit);
-  if(searchQuery) filtered = filtered.filter(u =>
+  if(filterDay)      filtered = filtered.filter(u => u.lastActive === filterDay);
+  if(filterShift)    filtered = filtered.filter(u => u.shift === filterShift);
+  if(filterUnit)     filtered = filtered.filter(u => u.unit  === filterUnit);
+  if(filterPosition) filtered = filtered.filter(u => u.position === filterPosition);
+  if(searchQuery)    filtered = filtered.filter(u =>
     u.name.toLowerCase().includes(searchQuery) ||
     u.id.toLowerCase().includes(searchQuery) ||
     (u.nickname||'').toLowerCase().includes(searchQuery)
@@ -6047,7 +6101,7 @@ async function renderUsersPanel() {
       <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}${u.nickname?' <span style="font-size:10px;color:var(--shopee);font-weight:700;">("'+u.nickname+'")</span>':''}</div>
-        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · ${u.shift}</div>
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · ${u.shift}${u.position?' · <span style=\"color:var(--shopee)\">'+u.position+'</span>':''}</div>
         <div style="font-size:10px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">
           <span style="color:var(--gold);font-weight:700;">⭐${u.xp||0}</span>
           <span style="color:var(--shopee);font-weight:700;">🔥${u.streak||0}</span>
@@ -6095,6 +6149,20 @@ async function renderUsersPanel() {
             ${shifts.map(s => `<option value="${s}"${filterShift===s?' selected':''}>${s}</option>`).join('')}
           </select>
         </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Cargo</label>
+        <select id="users-filter-position" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
+          <option value="">Todos</option>
+          ${['Log I','Log II','Assit','Líder','Analyst','Superv.','Coord.'].map(p => `<option value="${p}"${filterPosition===p?' selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Cargo</label>
+        <select id="users-filter-position" onchange="renderUsersPanel()" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:Nunito,sans-serif;font-size:13px;font-weight:600;background:#fff;">
+          <option value="">Todos</option>
+          ${['Log I','Log II','Assit','Líder','Analyst','Superv.','Coord.'].map(p => `<option value="${p}"${filterPosition===p?' selected':''}>${p}</option>`).join('')}
+        </select>
       </div>
       <div>
         <label style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:4px;">Filtrar por Dia (Último acesso)</label>
@@ -6157,16 +6225,34 @@ async function deleteUserFromPanel(uid, name) {
 function exportTodayToExcel() {
   const todayStr = today();
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
-  const todayUsers = allUsers.filter(u => u.lastActive === todayStr);
   const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
 
-  if(todayUsers.length === 0) {
-    alert('Nenhum acesso registrado hoje para exportar.');
+  // Read active filters from the panel
+  const filterDay   = document.getElementById('users-filter-day')   ? document.getElementById('users-filter-day').value   : '';
+  const filterShift = document.getElementById('users-filter-shift') ? document.getElementById('users-filter-shift').value : '';
+  const filterUnit  = document.getElementById('users-filter-unit')  ? document.getElementById('users-filter-unit').value  : '';
+  const searchQuery = document.getElementById('users-search-input') ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
+
+  // Apply same filters as the panel
+  let exportUsers = allUsers;
+  if(filterDay)   exportUsers = exportUsers.filter(u => u.lastActive === filterDay);
+  else            exportUsers = exportUsers.filter(u => u.lastActive === todayStr); // default: today
+  if(filterShift) exportUsers = exportUsers.filter(u => u.shift === filterShift);
+  if(filterUnit)  exportUsers = exportUsers.filter(u => u.unit === filterUnit);
+  if(searchQuery) exportUsers = exportUsers.filter(u =>
+    u.name.toLowerCase().includes(searchQuery) ||
+    u.id.toLowerCase().includes(searchQuery) ||
+    (u.nickname||'').toLowerCase().includes(searchQuery)
+  );
+
+  if(exportUsers.length === 0) {
+    alert('Nenhum colaborador encontrado com os filtros ativos.');
     return;
   }
 
-  const headers = ['Nome','Apelido','CPF','Unidade','Turno','XP','Streak','Lições Concluídas','Total Lições','Progresso (%)','Último Acesso'];
-  const rows = todayUsers.map(u => {
+  const exportDate = filterDay || todayStr;
+  const headers = ['Nome','Apelido','CPF','Unidade','Turno','Cargo','XP','Streak','Lições Concluídas','Total Lições','Progresso (%)','Último Acesso'];
+  const rows = exportUsers.map(u => {
     const done = (u.completedLessons||[]).length;
     const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
     return [
@@ -6175,6 +6261,7 @@ function exportTodayToExcel() {
       u.id,
       u.unit,
       u.shift,
+      u.position||'',
       u.xp||0,
       u.streak||0,
       done,
@@ -6194,12 +6281,12 @@ function exportTodayToExcel() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = 'acessos_' + todayStr + '.csv';
+  a.download = 'exportacao_' + exportDate + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('📥 Excel exportado: ' + todayUsers.length + ' colaborador(es).');
+  showToast('📥 Excel exportado: ' + exportUsers.length + ' colaborador(es).');
 }
 
 
@@ -6466,6 +6553,397 @@ function toggleCRMLesson(id) {
   if(!el) return;
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
+
+// ============================================================
+// PROFILE UPDATE MODAL
+// ============================================================
+function showProfileUpdateModal(user) {
+  const modal = document.getElementById('modal-profile-update');
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+  // Pre-select existing position if any
+  const sel = document.getElementById('update-position');
+  if(user.position) sel.value = user.position;
+}
+
+async function submitProfileUpdate() {
+  const position = document.getElementById('update-position').value;
+  const errEl = document.getElementById('update-profile-error');
+  if(!position) {
+    errEl.textContent = '⚠️ Selecione seu cargo para continuar.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+  const user = state.currentUser;
+  user.position = position;
+  await saveUser(user);
+  // Hide modal
+  const modal = document.getElementById('modal-profile-update');
+  modal.classList.add('hidden');
+  modal.style.display = 'none';
+  // Route based on position
+  if(position === 'Líder') {
+    updateLeaderNavStats();
+    renderLeaderHome();
+    showScreen('screen-leader');
+  } else {
+    if(user.isAdmin) {
+      document.getElementById('nav-admin').classList.remove('hidden');
+      document.getElementById('nav-crm').classList.remove('hidden');
+      document.getElementById('nav-users').classList.remove('hidden');
+      document.getElementById('nav-monitoring').classList.remove('hidden');
+    }
+    showScreen('screen-welcome');
+    updateNavStats();
+    setTimeout(function() {
+      showScreen('screen-main');
+      renderHome();
+      switchPage('home');
+    }, 5000);
+  }
+}
+
+// ============================================================
+// LEADER / HSE INTERFACE
+// ============================================================
+const HSE_MODULE = {
+  id: 'mod_hse_lider',
+  title: 'HSE — Saúde, Segurança e Meio Ambiente',
+  description: 'Módulo exclusivo para Líderes: normas de segurança, prevenção de acidentes, EPIs, ergonomia e gestão de riscos no SOC.',
+  icon: '🦺',
+  color: 'linear-gradient(135deg,#E74C3C,#C0392B)',
+  lessons: [
+    {
+      id: 'hse_l1',
+      title: 'EPIs e Normas de Segurança',
+      description: 'Equipamentos de proteção individual, NR-6 e boas práticas de uso',
+      xpReward: 120,
+      questions: [
+        {
+          type: 'multiple',
+          q: 'Qual a principal responsabilidade do Líder em relação ao uso de EPIs na operação?',
+          options: [
+            'Apenas informar a equipe sobre a existência dos EPIs',
+            'Fiscalizar o uso correto, garantir disponibilidade e treinar a equipe sobre a importância de cada EPI',
+            'Distribuir EPIs apenas quando solicitado',
+            'Substituir os EPIs com a máxima frequência possível'
+          ],
+          answer: 1,
+          explanation: 'O Líder é responsável por garantir que os EPIs estejam disponíveis, sejam usados corretamente e que a equipe seja treinada sobre sua importância, conforme NR-6.'
+        },
+        {
+          type: 'truefalse',
+          q: 'O uso de bota de segurança é obrigatório para todos os colaboradores que atuam na área operacional do SOC.',
+          answer: true,
+          explanation: 'Correto. A bota de segurança com biqueira de aço é EPI obrigatório para toda a equipe operacional, protegendo contra quedas de objetos e compressão.'
+        },
+        {
+          type: 'multiple',
+          q: 'Qual procedimento deve ser adotado quando um colaborador se recusa a usar o EPI?',
+          options: [
+            'Liberar o colaborador para o posto sem o EPI',
+            'Ignorar, pois é responsabilidade individual',
+            'Notificar formalmente, bloquear o acesso ao posto e registrar a ocorrência conforme o protocolo disciplinar',
+            'Cobrar verbalmente e aguardar o próximo turno'
+          ],
+          answer: 2,
+          explanation: 'A recusa ao uso de EPI deve ser tratada formalmente: notificação, bloqueio do posto e registro da ocorrência. O Líder não pode liberar colaborador sem EPI obrigatório.'
+        },
+        {
+          type: 'multiple',
+          q: 'Qual EPI é obrigatório para colaboradores que operam empilhadeiras ou movimentam cargas pesadas?',
+          options: [
+            'Apenas colete refletivo',
+            'Luvas, colete refletivo e bota de segurança como mínimo obrigatório',
+            'Somente capacete',
+            'EPI não é obrigatório para operadores treinados'
+          ],
+          answer: 1,
+          explanation: 'Para movimentação de cargas pesadas, o mínimo obrigatório inclui luvas de proteção, colete refletivo e bota de segurança, podendo haver requisitos adicionais conforme a atividade.'
+        },
+        {
+          type: 'truefalse',
+          q: 'O Líder deve inspecionar visualmente os EPIs da equipe no início de cada turno.',
+          answer: true,
+          explanation: 'Correto. A inspeção visual dos EPIs no início do turno garante que os equipamentos estejam em bom estado de conservação e uso, prevenindo acidentes por falha do equipamento.'
+        }
+      ]
+    },
+    {
+      id: 'hse_l2',
+      title: 'Prevenção de Acidentes e Gestão de Riscos',
+      description: 'Identificação de riscos, APR, investigação de incidentes e cultura de segurança',
+      xpReward: 130,
+      questions: [
+        {
+          type: 'multiple',
+          q: 'O que é a APR (Análise Preliminar de Risco) e quando deve ser realizada no SOC?',
+          options: [
+            'Relatório mensal enviado ao RH',
+            'Ferramenta de identificação de riscos realizada antes de atividades não rotineiras ou de alto risco, listando perigos e medidas preventivas',
+            'Avaliação de desempenho individual dos colaboradores',
+            'Documento preenchido apenas após acidentes'
+          ],
+          answer: 1,
+          explanation: 'A APR é uma ferramenta preventiva aplicada antes de atividades não rotineiras ou de alto risco, identificando perigos, avaliando riscos e definindo medidas de controle antes do início da atividade.'
+        },
+        {
+          type: 'truefalse',
+          q: 'Todo incidente — mesmo sem lesão — deve ser registrado e investigado pelo Líder.',
+          answer: true,
+          explanation: 'Correto. Incidentes sem lesão (quase-acidentes) são oportunidades de aprendizado. Registrar e investigar permite identificar causas raiz e implementar ações preventivas antes que um acidente real ocorra.'
+        },
+        {
+          type: 'multiple',
+          q: 'Qual das situações abaixo representa um risco de segurança imediato na área operacional?',
+          options: [
+            'Corredor desobstruído com sinalização adequada',
+            'Piso molhado sem sinalização de aviso, empilhamento acima do limite e EPI não utilizado simultaneamente',
+            'Uso correto de empilhadeira com velocidade reduzida',
+            'Uniforme completo e EPIs em bom estado'
+          ],
+          answer: 1,
+          explanation: 'Piso molhado sem sinalização, empilhamento além do limite e ausência de EPI são riscos imediatos que podem resultar em quedas, esmagamentos e lesões graves.'
+        },
+        {
+          type: 'multiple',
+          q: 'Como o Líder deve proceder ao identificar um colaborador executando uma tarefa de forma insegura?',
+          options: [
+            'Aguardar o término da tarefa para conversar',
+            'Ignorar se não houve acidentes anteriores',
+            'Interromper imediatamente a atividade, corrigir a forma de execução e registrar a ocorrência no sistema de segurança',
+            'Enviar um e-mail ao colaborador explicando o correto'
+          ],
+          answer: 2,
+          explanation: 'Atividade insegura deve ser interrompida imediatamente. O Líder deve corrigir no ato, garantir a execução correta e registrar a ocorrência para análise de tendências e ações corretivas.'
+        },
+        {
+          type: 'truefalse',
+          q: 'O Líder é responsável por conduzir o DDS (Diálogo Diário de Segurança) com sua equipe antes do início de cada turno.',
+          answer: true,
+          explanation: 'Correto. O DDS é uma ferramenta fundamental da cultura de segurança. Realizado pelo Líder antes do turno, reforça comportamentos seguros, aborda riscos do dia e engaja a equipe na prevenção de acidentes.'
+        },
+        {
+          type: 'order',
+          q: 'Ordene o procedimento correto após um acidente com lesão no SOC:',
+          steps: [
+            'Registrar o acidente no sistema de segurança e abrir CAT se necessário',
+            'Prestar socorro imediato e acionar o SAMU/Bombeiros se necessário',
+            'Investigar o acidente identificando causas raiz',
+            'Isolar a área do acidente para preservar evidências',
+            'Implementar ações corretivas para evitar recorrência'
+          ],
+          correctOrder: [1, 3, 0, 2, 4],
+          explanation: 'Após acidente: socorro → isolar área → registrar/CAT → investigar causas → implementar ações corretivas.'
+        }
+      ]
+    },
+    {
+      id: 'hse_l3',
+      title: 'Ergonomia, Saúde Ocupacional e Meio Ambiente',
+      description: 'Posturas corretas, saúde do trabalhador e práticas ambientais no SOC',
+      xpReward: 110,
+      questions: [
+        {
+          type: 'multiple',
+          q: 'Qual é o peso máximo recomendado para levantamento manual de cargas por um colaborador adulto, conforme NR-17?',
+          options: [
+            '10 kg',
+            '60 kg',
+            '23 kg (individual) para homens adultos em condições ideais, com limites menores para trabalho repetitivo',
+            'Não há limite definido'
+          ],
+          answer: 2,
+          explanation: 'A NR-17 estabelece como referência 23 kg para levantamento eventual por homens adultos. Para trabalho repetitivo e outros grupos, os limites são menores. O Líder deve garantir auxílio mecânico quando o peso for excessivo.'
+        },
+        {
+          type: 'truefalse',
+          q: 'O Líder deve monitorar sinais de fadiga, dores musculares e desconforto na equipe como parte da gestão de saúde ocupacional.',
+          answer: true,
+          explanation: 'Correto. Monitorar a saúde dos colaboradores é responsabilidade do Líder. Sinais de LER/DORT identificados precocemente evitam afastamentos e processos trabalhistas.'
+        },
+        {
+          type: 'multiple',
+          q: 'Qual prática ambiental é obrigatória no descarte de embalagens e resíduos no SOC?',
+          options: [
+            'Misturar todos os resíduos em um único container',
+            'Separar os resíduos conforme a coleta seletiva: papel, plástico, metal e orgânico, descartando em pontos sinalizados',
+            'Queimar embalagens ao final do turno',
+            'Enviar todos os resíduos para o GOL'
+          ],
+          answer: 1,
+          explanation: 'A separação de resíduos na coleta seletiva é obrigatória e responsabilidade de todos. O Líder deve garantir que os pontos de descarte estejam disponíveis e que a equipe siga os procedimentos ambientais.'
+        },
+        {
+          type: 'multiple',
+          q: 'Como o Líder deve agir ao perceber colaboradores executando tarefas em posturas ergonomicamente incorretas?',
+          options: [
+            'Ignorar, pois é responsabilidade do médico do trabalho',
+            'Corrigir imediatamente, demonstrar a postura correta e, se necessário, solicitar ajuste no posto de trabalho ao time de HSE',
+            'Aguardar o próximo treinamento anual de ergonomia',
+            'Registrar no sistema e aguardar orientação do RH'
+          ],
+          answer: 1,
+          explanation: 'O Líder deve corrigir posturas incorretas imediatamente, demonstrando a forma correta. Postos que estruturalmente induzem a posturas inadequadas devem ser reportados ao time de HSE para ajuste.'
+        },
+        {
+          type: 'truefalse',
+          q: 'O uso adequado de pausas e rodízio de funções é uma medida ergonômica que o Líder pode implementar para prevenir LER/DORT.',
+          answer: true,
+          explanation: 'Correto. Pausas regulares e rodízio de funções distribuem a carga física, reduzem a exposição repetitiva e previnem lesões musculoesqueléticas — ferramentas diretas na mão do Líder.'
+        }
+      ]
+    }
+  ]
+};
+
+function updateLeaderNavStats() {
+  const u = state.currentUser;
+  if(!u) return;
+  const el1 = document.getElementById('leader-nav-streak');
+  const el2 = document.getElementById('leader-nav-xp');
+  const el3 = document.getElementById('leader-nav-lives');
+  if(el1) el1.textContent = u.streak || 0;
+  if(el2) el2.textContent = (u.xp || 0).toLocaleString();
+  if(el3) el3.textContent = u.lives || 5;
+}
+
+function renderLeaderHome() {
+  const u = state.currentUser;
+  const el = document.getElementById('page-leader-home');
+  if(!el) return;
+  updateLeaderNavStats();
+
+  const mod = HSE_MODULE;
+  const totalLessons = mod.lessons.length;
+  const doneLessons = mod.lessons.filter(l => (u.completedLessons||[]).includes(l.id)).length;
+  const pct = totalLessons ? Math.round(doneLessons / totalLessons * 100) : 0;
+
+  let lessonsHtml = mod.lessons.map((les, idx) => {
+    const done = (u.completedLessons||[]).includes(les.id);
+    const locked = idx > 0 && !(u.completedLessons||[]).includes(mod.lessons[idx-1].id);
+    const numClass = done ? 'done' : locked ? 'locked-icon' : '';
+    const numContent = done ? '✓' : locked ? '🔒' : (idx+1);
+    return `<div class="lesson-card${locked?' locked':''}" onclick="${locked?'showLockedMsg()':'startLeaderLesson('+idx+')'}">
+      <div class="lesson-num ${numClass}">${numContent}</div>
+      <div class="lesson-info">
+        <h4>${les.title}</h4>
+        <p>${les.description}</p>
+      </div>
+      <div class="lesson-xp">+${les.xpReward} XP</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="greeting" style="margin-bottom:16px;">
+      <h2>👋 Olá, ${u.nickname || u.name.split(' ')[0]}!</h2>
+      <p>Interface exclusiva de Líderes — Módulo HSE</p>
+    </div>
+
+    <div class="streak-banner">
+      <div class="streak-icon">🦺</div>
+      <div>
+        <h3>HSE — Segurança em Foco</h3>
+        <p>Complete as lições para se tornar um Líder referência em segurança!</p>
+      </div>
+    </div>
+
+    <!-- Module card -->
+    <div class="module-card" style="margin-bottom:8px;cursor:default;" onclick="">
+      <div class="module-header">
+        <div class="module-icon" style="${mod.color.includes('gradient')?'background:'+mod.color:''}">${mod.icon}</div>
+        <div>
+          <h3>${mod.title}</h3>
+          <p class="module-desc">${mod.description}</p>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);font-weight:700;margin-bottom:4px;">
+        <span>Progresso</span><span>${pct}%</span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+    </div>
+
+    <div class="section-title" style="margin-top:20px;">📚 Lições</div>
+    ${lessonsHtml}
+
+    <!-- Stats -->
+    <div class="stats-grid" style="margin-top:20px;">
+      <div class="stat-card"><div class="sc-value">⭐ ${(u.xp||0).toLocaleString()}</div><div class="sc-label">XP Total</div></div>
+      <div class="stat-card"><div class="sc-value">🔥 ${u.streak||0}</div><div class="sc-label">Dias Seguidos</div></div>
+      <div class="stat-card"><div class="sc-value">📚 ${doneLessons}/${totalLessons}</div><div class="sc-label">Lições HSE</div></div>
+      <div class="stat-card"><div class="sc-value">❤️ ${u.lives||5}</div><div class="sc-label">Vidas</div></div>
+    </div>
+
+    <button class="btn-primary" style="margin-top:24px;background:linear-gradient(135deg,#666,#999);" onclick="logout()">Sair</button>
+  `;
+}
+
+// startLeaderLesson — used by HSE leader interface
+function startLeaderLesson(lessonIdx) {
+  const mod = HSE_MODULE;
+  const les = mod.lessons[lessonIdx];
+  if(!les) return;
+  state.currentModule = mod;
+  state.currentLesson = les;
+  state.quiz = {
+    questions: [...les.questions],
+    current: 0,
+    lives: state.currentUser.lives || 5,
+    errors: 0,
+    correct: 0,
+    startTime: Date.now(),
+    selectedAnswer: null,
+    answered: false
+  };
+  showScreen('screen-quiz');
+  renderQuestion();
+}
+
+// ============================================================
+// RANKING BY POSITION
+// ============================================================
+const POSITIONS_ORDER = ['Log I','Log II','Assit','Líder','Analyst','Superv.','Coord.'];
+
+async function renderRankingByPosition() {
+  const u = state.currentUser;
+  // Reload fresh
+  const { data: usersData } = await getDB().from('users').select('*');
+  (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
+  const allUsers = Object.values(state.users).filter(usr => !usr.isAdmin);
+  const container = document.getElementById('ranking-by-position');
+  if(!container) return;
+
+  let html = '';
+  POSITIONS_ORDER.forEach(pos => {
+    const group = allUsers.filter(usr => usr.position === pos);
+    if(group.length === 0) return;
+    group.sort((a,b) => (b.xp||0)-(a.xp||0));
+    html += `<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;border:2px solid var(--border);box-shadow:var(--shadow);">
+      <div style="font-weight:900;font-size:15px;margin-bottom:12px;color:var(--shopee);">🏅 ${pos} <span style="font-size:11px;color:var(--text2);font-weight:700;">(${group.length} colaborador${group.length>1?'es':''})</span></div>
+      <div class="ranking-list" style="gap:8px;">`;
+    group.forEach((usr, i) => {
+      const pos2 = i+1;
+      const posClass = pos2===1?'gold':pos2===2?'silver':pos2===3?'bronze':'other';
+      const posEmoji = pos2===1?'🥇':pos2===2?'🥈':pos2===3?'🥉':pos2;
+      const isMe = usr.id === u.id;
+      html += `<div class="ranking-item${isMe?' me':''}">
+        <div class="rank-pos ${posClass}">${posEmoji}</div>
+        <div class="rank-avatar">${usr.name.charAt(0)}</div>
+        <div class="rank-info">
+          <h4>${usr.name}${isMe?' (você)':''}</h4>
+          <p>${usr.unit} · ${usr.shift} · 🔥${usr.streak||0}</p>
+        </div>
+        <div class="rank-xp">⭐ ${(usr.xp||0).toLocaleString()}</div>
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+  if(!html) html = '<p style="text-align:center;color:var(--text2);font-weight:700;padding:30px 0;">Nenhum colaborador com cargo cadastrado ainda.</p>';
+  container.innerHTML = html;
+}
+
+
 // ============================================================
 // BOOT
 // ============================================================
@@ -6512,6 +6990,9 @@ window.renderMonitoring = renderMonitoring;
 window.clearMonitoringStats = clearMonitoringStats;
 window.clearMonitoringStats = clearMonitoringStats;
 window.searchUser = searchUser;
+window.submitProfileUpdate = submitProfileUpdate;
+window.renderLeaderHome = renderLeaderHome;
+window.renderRankingByPosition = renderRankingByPosition;
 window.openModule = openModule;
 window.backToHome = backToHome;
 window.startLesson = startLesson;
@@ -6543,5 +7024,50 @@ window.validarCPF = validarCPF;
 _ready = true;
 boot();
 </script>
+
+<!-- ===== PROFILE UPDATE MODAL ===== -->
+<div id="modal-profile-update" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:24px;padding:36px 28px;width:100%;max-width:420px;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:slideUp 0.4s ease;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:12px;">📋</div>
+      <h2 style="font-family:'Fredoka One',sans-serif;font-size:22px;color:var(--shopee);margin-bottom:6px;">Atualização de Cadastro</h2>
+      <p style="font-size:13px;color:var(--text2);font-weight:600;">Precisamos que você complete seu cadastro com o seu cargo para continuar.</p>
+    </div>
+    <div class="form-group">
+      <label>Cargo <span style="color:var(--shopee)">*</span></label>
+      <select id="update-position" style="width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:600;color:var(--text);background:#fff;outline:none;">
+        <option value="">Selecione seu cargo</option>
+        <option value="Log I">Log I</option>
+        <option value="Log II">Log II</option>
+        <option value="Assit">Assit</option>
+        <option value="Líder">Líder</option>
+        <option value="Analyst">Analyst</option>
+        <option value="Superv.">Superv.</option>
+        <option value="Coord.">Coord.</option>
+      </select>
+    </div>
+    <div id="update-profile-error" class="error-msg hidden"></div>
+    <button class="btn-primary" onclick="submitProfileUpdate()" style="margin-top:8px;">✅ Salvar e Continuar</button>
+  </div>
+</div>
+
+<!-- ===== LEADER SCREEN ===== -->
+<div class="screen" id="screen-leader">
+  <!-- Top Nav Leader -->
+  <div class="top-nav">
+    <div class="nav-logo"><span style="font-size:20px;">🦺</span> <span style="font-family:'Fredoka One',sans-serif;font-size:20px;color:var(--shopee);">HSE Academy</span></div>
+    <div class="nav-stats">
+      <div class="stat-pill"><span class="icon">🔥</span><span id="leader-nav-streak">0</span></div>
+      <div class="stat-pill"><span class="icon">⭐</span><span id="leader-nav-xp">0</span></div>
+      <div class="stat-pill"><span class="icon">❤️</span><span id="leader-nav-lives">5</span></div>
+      <button onclick="logout()" style="background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:var(--text2);padding:6px 10px;border-radius:8px;" onmouseover="this.style.color='var(--shopee)';this.style.background='#FFF0EE'" onmouseout="this.style.color='var(--text2)';this.style.background='none'">Sair</button>
+    </div>
+  </div>
+
+  <div class="page-content" id="page-leader-home" style="overflow-y:auto;max-height:calc(100vh - 120px);padding-bottom:40px;">
+    <!-- injected by renderLeaderHome() -->
+  </div>
+</div>
+
 </body>
 </html>
