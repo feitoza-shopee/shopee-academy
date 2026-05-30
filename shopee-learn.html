@@ -1353,7 +1353,9 @@ function rowToUser(row) {
     lastActive: row.last_active || today(),
     completedLessons: (() => { try { return JSON.parse(row.completed_lessons || '[]'); } catch(e) { return []; } })(),
     isAdmin: row.is_admin || false,
-    totalAccesses: row.total_accesses || 0
+    totalAccesses: row.total_accesses || 0,
+    questionsAnswered: row.questions_answered || 0,
+    completedModules: row.completed_modules || 0
   };
 }
 
@@ -3473,7 +3475,9 @@ async function saveUser(user) {
     last_active: user.lastActive || today(),
     completed_lessons: JSON.stringify(user.completedLessons || []),
     is_admin: user.isAdmin || false,
-    total_accesses: user.totalAccesses || 0
+    total_accesses: user.totalAccesses || 0,
+    questions_answered: user.questionsAnswered || 0,
+    completed_modules: user.completedModules || 0
   };
   const { error } = await getDB().from('users').upsert(row, { onConflict: 'id' });
   if(error) console.error('saveUser error:', error);
@@ -4243,10 +4247,29 @@ async function finishQuiz() {
   const lessonMinutes = Math.round((Date.now() - q.startTime) / 60000);
   u.totalMinutes = (u.totalMinutes || 0) + lessonMinutes;
 
+  // Track questions answered
+  if(!u.isAdmin) {
+    u.questionsAnswered = (u.questionsAnswered || 0) + q.questions.length;
+  }
+
   // Mark lesson complete
   if(!(u.completedLessons||[]).includes(lesson.id)) {
     if(!u.completedLessons) u.completedLessons = [];
     u.completedLessons.push(lesson.id);
+
+    // Recalculate completed modules count
+    const allMods = [...state.modules];
+    if(typeof HSE_MODULE !== 'undefined') allMods.push(HSE_MODULE);
+    u.completedModules = allMods.filter(m => m.lessons.length > 0 && m.lessons.every(l => u.completedLessons.includes(l.id))).length;
+
+    // Leader auto-migration: if leader just finished the HSE module, unlock regular modules
+    if(u.position === 'Líder' && !u.isAdmin && typeof HSE_MODULE !== 'undefined') {
+      const hseAllDone = HSE_MODULE.lessons.every(l => u.completedLessons.includes(l.id));
+      if(hseAllDone && !u._hseGraduated) {
+        u._hseGraduated = true;
+        showToast('🎓 Parabéns! Você concluiu o módulo HSE e desbloqueou os módulos gerais!');
+      }
+    }
   }
   saveUser(u); // fire and forget
   updateNavStats();
@@ -4860,7 +4883,12 @@ async function renderAdmin() {
       </div>
 
       <!-- Existing modules with lesson/question management -->
-      <div style="font-weight:900;font-size:13px;margin-bottom:10px;color:var(--text)">📋 Módulos Existentes</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-weight:900;font-size:13px;color:var(--text)">📋 Módulos Existentes</div>
+        <button onclick="adminSaveModules()" id="btn-save-modules" style="background:linear-gradient(135deg,#27AE60,#2ECC71);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(46,204,113,0.3);">
+          💾 Salvar Alterações
+        </button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:12px;" id="adm-modules-list">
         ${renderAdminModulesList()}
       </div>
@@ -6151,6 +6179,8 @@ async function renderUsersPanel() {
 
   const userRow = (u) => {
     const done = (u.completedLessons||[]).length;
+    const totalMods = state.modules.length + (typeof HSE_MODULE !== 'undefined' ? 1 : 0);
+    const doneMods = u.completedModules || 0;
     const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
     const isActiveToday = u.lastActive === todayStr;
     const safeName = u.name.replace(/'/g,"&#39;");
@@ -6163,6 +6193,8 @@ async function renderUsersPanel() {
           <span style="color:var(--gold);font-weight:700;">⭐${u.xp||0}</span>
           <span style="color:var(--shopee);font-weight:700;">🔥${u.streak||0}</span>
           <span style="color:var(--blue);font-weight:700;">📚${done}/${totalLessons}</span>
+          <span style="color:var(--purple);font-weight:700;">📦${doneMods}/${totalMods} mód.</span>
+          <span style="color:var(--green);font-weight:700;">❓${u.questionsAnswered||0} Q</span>
           <span style="color:${isActiveToday?'var(--green)':'var(--text2)'};font-weight:700;">${isActiveToday?'🟢 Hoje':'⚪ '+u.lastActive}</span>
         </div>
       </div>
@@ -6331,11 +6363,12 @@ function exportTodayToExcel() {
   else if(filterDateTo)   periodLabel = 'ate_' + filterDateTo;
   else                    periodLabel = todayStr;
 
-  const headers = ['Nome','Apelido','CPF','Unidade','Turno','Cargo','XP','Streak','Lições Concluídas','Total Lições','Progresso (%)','Último Acesso'];
+  const headers = ['Nome','Unidade','Turno','Cargo','XP','Total de Questões Respondidas','Total de Módulos Concluídos','Total de Lições Concluídas','Total Lições','Progresso (%)','Último Acesso'];
+  const totalMods = state.modules.length + (typeof HSE_MODULE !== 'undefined' ? 1 : 0);
   const rows = exportUsers.map(u => {
     const done = (u.completedLessons||[]).length;
     const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
-    return [u.name, u.nickname||'', u.id, u.unit, u.shift, u.position||'', u.xp||0, u.streak||0, done, totalLessons, pct+'%', u.lastActive];
+    return [u.name, u.unit, u.shift, u.position||'', u.xp||0, u.questionsAnswered||0, u.completedModules||0, done, totalLessons, pct+'%', u.lastActive];
   });
 
   const BOM = '﻿';
@@ -6749,7 +6782,29 @@ boot();
       <button onclick="logout()" style="background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:var(--text2);padding:6px 10px;border-radius:8px;">Sair</button>
     </div>
   </div>
-  <div class="page-content" id="page-leader-home" style="overflow-y:auto;max-height:calc(100vh - 120px);padding-bottom:40px;"></div>
+  <div class="page-content" id="page-leader-home" style="overflow-y:auto;max-height:calc(100vh - 170px);padding-bottom:40px;"></div>
+  <div class="page-content hidden" id="page-leader-ranking" style="overflow-y:auto;max-height:calc(100vh - 170px);padding-bottom:40px;">
+    <div style="padding:16px 16px 0;">
+      <div class="section-title" style="margin-bottom:12px;">🏆 Ranking</div>
+      <div class="tabs" style="margin-bottom:14px;" id="leader-ranking-tabs">
+        <button class="tab-btn active" id="leader-rank-tab-turno"    onclick="leaderSwitchRankingTab('turno')">Meu Turno</button>
+        <button class="tab-btn"        id="leader-rank-tab-unidade"  onclick="leaderSwitchRankingTab('unidade')">Minha Unidade</button>
+        <button class="tab-btn"        id="leader-rank-tab-nacional" onclick="leaderSwitchRankingTab('nacional')">Nacional</button>
+        <button class="tab-btn"        id="leader-rank-tab-cargo"    onclick="leaderSwitchRankingTab('cargo')">Por Cargo</button>
+      </div>
+      <div id="leader-ranking-list"></div>
+      <div id="leader-ranking-by-position" style="display:none;"></div>
+    </div>
+  </div>
+  <!-- Bottom nav -->
+  <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--card);border-top:1.5px solid var(--border);display:flex;z-index:100;">
+    <button id="leader-tab-home" onclick="leaderShowTab('home')" style="flex:1;padding:10px 0 12px;border:none;background:none;cursor:pointer;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:var(--shopee);display:flex;flex-direction:column;align-items:center;gap:2px;">
+      <span style="font-size:22px;">🏠</span>Início
+    </button>
+    <button id="leader-tab-ranking" onclick="leaderShowTab('ranking')" style="flex:1;padding:10px 0 12px;border:none;background:none;cursor:pointer;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;color:var(--text2);display:flex;flex-direction:column;align-items:center;gap:2px;">
+      <span style="font-size:22px;">🏆</span>Ranking
+    </button>
+  </div>
 </div>
 
 <script>
@@ -6915,6 +6970,46 @@ function renderLeaderHome() {
       '<div style="font-size:12px;opacity:0.9;font-weight:600">Volte amanhã — suas vidas serão renovadas automaticamente.</div></div></div>';
   }
 
+  const hseAllDone = mod.lessons.length > 0 && mod.lessons.every(l => (u.completedLessons||[]).includes(l.id));
+
+  // Build extra modules section if HSE is completed
+  let extraModulesHtml = '';
+  if(hseAllDone && state.modules && state.modules.length > 0) {
+    const modCards = state.modules.map((rm, mi) => {
+      const totalRl = rm.lessons.length;
+      const doneRl  = rm.lessons.filter(l => (u.completedLessons||[]).includes(l.id)).length;
+      const pctRl   = totalRl ? Math.round(doneRl/totalRl*100) : 0;
+      const isModDone = totalRl > 0 && doneRl === totalRl;
+      const lessonCards = rm.lessons.map((les, li) => {
+        const lessDone   = (u.completedLessons||[]).includes(les.id);
+        const lessLocked = li > 0 && !(u.completedLessons||[]).includes(rm.lessons[li-1].id);
+        const lessBlocked = !lessDone && !lessLocked && noLives;
+        const numContent = lessDone ? '✓' : (lessLocked || lessBlocked) ? '🔒' : (li+1);
+        const numClass   = lessDone ? 'done' : (lessLocked || lessBlocked) ? 'locked-icon' : '';
+        const clickFn    = lessLocked ? 'showLockedMsg()' : lessBlocked ? 'showNoLivesModal()' : 'startLeaderRegularLesson('+mi+','+li+')';
+        return '<div class="lesson-card' + (lessLocked||lessBlocked?' locked':'') + '" onclick="' + clickFn + '">' +
+          '<div class="lesson-num ' + numClass + '">' + numContent + '</div>' +
+          '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + (les.description||'') + '</p></div>' +
+          '<div class="lesson-xp">+' + les.xpReward + ' XP</div></div>';
+      }).join('');
+      return '<div class="module-card" style="margin-bottom:12px;">' +
+        (isModDone ? '<span class="badge-complete">✓ Completo</span>' : '') +
+        '<div class="module-header"><div class="module-icon" style="background:' + rm.color + '">' + rm.icon + '</div>' +
+        '<div><h3>' + rm.title + '</h3><p class="module-desc">' + rm.description + '</p></div></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);font-weight:700;margin-bottom:4px"><span>Progresso</span><span>' + pctRl + '%</span></div>' +
+        '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + pctRl + '%"></div></div>' +
+        '<div style="margin-top:12px;">' + lessonCards + '</div>' +
+        '</div>';
+    }).join('');
+    extraModulesHtml =
+      '<div style="background:linear-gradient(135deg,#27AE60,#2ECC71);border-radius:16px;padding:16px 20px;margin-top:20px;margin-bottom:16px;color:#fff;display:flex;align-items:center;gap:12px;">' +
+        '<div style="font-size:32px">🎓</div>' +
+        '<div><div style="font-weight:900;font-size:15px;">Módulo HSE Concluído!</div><div style="font-size:12px;opacity:0.9;">Você desbloqueou os módulos gerais abaixo.</div></div>' +
+      '</div>' +
+      '<div class="section-title" style="margin-top:4px;">📦 Módulos Gerais</div>' +
+      modCards;
+  }
+
   el.innerHTML =
     '<div class="greeting" style="margin-bottom:16px"><h2>👋 Olá, ' + (u.nickname||u.name.split(' ')[0]) + '!</h2><p>Interface exclusiva de Líderes — Módulo HSE</p></div>' +
     '<div class="streak-banner"><div class="streak-icon">🦺</div><div><h3>HSE — Segurança em Foco</h3><p>Complete as lições para se tornar um Líder referência em segurança!</p></div></div>' +
@@ -6924,7 +7019,8 @@ function renderLeaderHome() {
       '<div><h3>' + mod.title + '</h3><p class="module-desc">' + mod.description + '</p></div></div>' +
       '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);font-weight:700;margin-bottom:4px"><span>Progresso</span><span>' + pct + '%</span></div>' +
       '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + pct + '%"></div></div></div>' +
-    '<div class="section-title" style="margin-top:20px">📚 Lições</div>' + lessonsHtml +
+    '<div class="section-title" style="margin-top:20px">📚 Lições HSE</div>' + lessonsHtml +
+    extraModulesHtml +
     '<div class="stats-grid" style="margin-top:20px">' +
       '<div class="stat-card"><div class="sc-value">⭐ ' + (u.xp||0).toLocaleString() + '</div><div class="sc-label">XP Total</div></div>' +
       '<div class="stat-card"><div class="sc-value">🔥 ' + (u.streak||0) + '</div><div class="sc-label">Dias Seguidos</div></div>' +
@@ -6936,6 +7032,26 @@ function renderLeaderHome() {
 function startLeaderLesson(lessonIdx) {
   if(!hasLives()) { showNoLivesModal(); return; }
   const mod = HSE_MODULE;
+  const les = mod.lessons[lessonIdx];
+  if(!les) return;
+  state.currentModule = mod;
+  state.currentLesson = les;
+  state.quiz = {
+    questions: [...les.questions],
+    current: 0,
+    lives: (state.currentUser.lives !== undefined && state.currentUser.lives !== null) ? state.currentUser.lives : 5,
+    errors: 0, correct: 0,
+    startTime: Date.now(),
+    selectedAnswer: null, answered: false
+  };
+  showScreen('screen-quiz');
+  renderQuestion();
+}
+
+function startLeaderRegularLesson(modIdx, lessonIdx) {
+  if(!hasLives()) { showNoLivesModal(); return; }
+  const mod = state.modules[modIdx];
+  if(!mod) return;
   const les = mod.lessons[lessonIdx];
   if(!les) return;
   state.currentModule = mod;
@@ -7095,8 +7211,121 @@ window.closeNoLivesModal     = closeNoLivesModal;
 window.hasLives              = hasLives;
 window.renderLeaderHome      = renderLeaderHome;
 window.startLeaderLesson     = startLeaderLesson;
+window.startLeaderRegularLesson = startLeaderRegularLesson;
+window.leaderShowTab            = leaderShowTab;
+window.leaderSwitchRankingTab   = leaderSwitchRankingTab;
+
+function leaderShowTab(tab) {
+  const home    = document.getElementById('page-leader-home');
+  const ranking = document.getElementById('page-leader-ranking');
+  const btnHome    = document.getElementById('leader-tab-home');
+  const btnRanking = document.getElementById('leader-tab-ranking');
+  const shopeeColor = getComputedStyle(document.documentElement).getPropertyValue('--shopee').trim() || '#EE4D2D';
+  const mutedColor  = getComputedStyle(document.documentElement).getPropertyValue('--text2').trim() || '#888';
+
+  if(tab === 'home') {
+    home.classList.remove('hidden');
+    ranking.classList.add('hidden');
+    btnHome.style.color    = shopeeColor;
+    btnRanking.style.color = mutedColor;
+  } else {
+    home.classList.add('hidden');
+    ranking.classList.remove('hidden');
+    btnHome.style.color    = mutedColor;
+    btnRanking.style.color = shopeeColor;
+    state.leaderRankingTab = state.leaderRankingTab || 'turno';
+    leaderSwitchRankingTab(state.leaderRankingTab);
+  }
+}
+
+function leaderSwitchRankingTab(tab) {
+  state.leaderRankingTab = tab;
+  ['turno','unidade','nacional','cargo'].forEach(t => {
+    const btn = document.getElementById('leader-rank-tab-'+t);
+    if(btn) btn.classList.toggle('active', t === tab);
+  });
+  const listEl = document.getElementById('leader-ranking-list');
+  const posEl  = document.getElementById('leader-ranking-by-position');
+  if(tab === 'cargo') {
+    if(listEl) listEl.style.display = 'none';
+    if(posEl)  posEl.style.display  = 'block';
+    leaderRenderRankingByPosition();
+  } else {
+    if(listEl) listEl.style.display = '';
+    if(posEl)  posEl.style.display  = 'none';
+    leaderRenderRanking(tab);
+  }
+}
+
+async function leaderRenderRanking(tab) {
+  const u = state.currentUser;
+  const { data: usersData } = await getDB().from('users').select('*');
+  (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
+  const allUsers = Object.values(state.users).filter(usr => !usr.isAdmin);
+  let filtered;
+  if(tab==='turno')    filtered = allUsers.filter(usr => usr.unit===u.unit && usr.shift===u.shift);
+  else if(tab==='unidade') filtered = allUsers.filter(usr => usr.unit===u.unit);
+  else filtered = allUsers;
+  filtered.sort((a,b) => (b.xp||0)-(a.xp||0));
+  let html = '';
+  filtered.forEach((usr, i) => {
+    const pos = i+1;
+    const isMe = usr.id === u.id;
+    const posClass = pos===1?'gold':pos===2?'silver':pos===3?'bronze':'other';
+    const posEmoji = pos===1?'🥇':pos===2?'🥈':pos===3?'🥉':pos;
+    html += `<div class="ranking-item${isMe?' me':''}">
+      <div class="rank-pos ${posClass}">${posEmoji}</div>
+      <div class="rank-avatar">${usr.name.charAt(0)}</div>
+      <div class="rank-info"><h4>${usr.name}${isMe?' (você)':''}</h4><p>${usr.unit} · ${usr.shift}${usr.position?' · '+usr.position:''} · 🔥${usr.streak||0} dias</p></div>
+      <div class="rank-xp">⭐ ${(usr.xp||0).toLocaleString()}</div>
+    </div>`;
+  });
+  if(!filtered.length) html='<p style="text-align:center;color:var(--text2);font-weight:700;padding:40px 0">Nenhum usuário neste filtro ainda.</p>';
+  const listEl = document.getElementById('leader-ranking-list');
+  if(listEl) listEl.innerHTML = html;
+}
+
+async function leaderRenderRankingByPosition() {
+  const { data: usersData } = await getDB().from('users').select('*');
+  (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
+  const allUsers = Object.values(state.users).filter(usr => !usr.isAdmin);
+  const positions = [...new Set(allUsers.map(u => u.position||'Sem Cargo').filter(Boolean))];
+  let html = '';
+  positions.forEach(pos => {
+    const group = allUsers.filter(u => (u.position||'Sem Cargo') === pos).sort((a,b)=>(b.xp||0)-(a.xp||0));
+    html += `<div style="margin-bottom:20px;">
+      <div style="font-weight:900;font-size:13px;color:var(--shopee);margin-bottom:8px;padding:6px 10px;background:var(--shopee-bg,#FFF0EE);border-radius:10px;">👤 ${pos}</div>`;
+    group.forEach((usr, i) => {
+      const isMe = usr.id === state.currentUser.id;
+      const posEmoji = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+      html += `<div class="ranking-item${isMe?' me':''}">
+        <div class="rank-pos ${i<3?['gold','silver','bronze'][i]:'other'}">${posEmoji}</div>
+        <div class="rank-avatar">${usr.name.charAt(0)}</div>
+        <div class="rank-info"><h4>${usr.name}${isMe?' (você)':''}</h4><p>${usr.unit} · ${usr.shift} · 🔥${usr.streak||0} dias</p></div>
+        <div class="rank-xp">⭐ ${(usr.xp||0).toLocaleString()}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  if(!html) html='<p style="text-align:center;color:var(--text2);font-weight:700;padding:40px 0">Nenhum usuário cadastrado ainda.</p>';
+  const posEl = document.getElementById('leader-ranking-by-position');
+  if(posEl) posEl.innerHTML = html;
+}
 window.renderRankingByPosition = renderRankingByPosition;
 window.switchRankingTab      = switchRankingTab;
+
+function adminSaveModules() {
+  saveModules();
+  const btn = document.getElementById('btn-save-modules');
+  if(btn) {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ Salvo!';
+    btn.style.background = 'linear-gradient(135deg,#2ECC71,#27AE60)';
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+  }
+  showToast('💾 Módulos e lições salvos com sucesso!');
+}
+window.adminSaveModules = adminSaveModules;
 </script>
 
 </body>
