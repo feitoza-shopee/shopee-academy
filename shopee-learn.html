@@ -3890,17 +3890,25 @@ function openModule(modId) {
   mod.lessons.forEach((lesson, li) => {
     const done = (u.completedLessons||[]).includes(lesson.id);
     const isLocked = !state.currentUser.isAdmin && li > 0 && !(u.completedLessons||[]).includes(mod.lessons[li-1].id);
+    const noLives = !hasLives();
+    const blocked = !done && !isLocked && noLives;
+
+    let clickFn = '';
+    if(done) clickFn = 'showLessonDoneMsg()';
+    else if(isLocked) clickFn = '';
+    else if(blocked) clickFn = 'showNoLivesModal()';
+    else clickFn = 'startLesson(\''+mod.id+'\',\''+lesson.id+'\')';
 
     html += `
-      <div class="lesson-card${isLocked?' locked':''}" onclick="${isLocked?'':'startLesson(\''+mod.id+'\',\''+lesson.id+'\')'}">
-        <div class="lesson-num${done?' done':isLocked?' locked-icon':''}">
-          ${done?'✓':isLocked?'🔒':(li+1)}
+      <div class="lesson-card${(isLocked||blocked)?' locked':''}" onclick="${clickFn}">
+        <div class="lesson-num${done?' done':(isLocked||blocked)?' locked-icon':''}">
+          ${done?'✓':(isLocked||blocked)?'🔒':(li+1)}
         </div>
         <div class="lesson-info">
           <h4>${lesson.title}</h4>
-          <p>${lesson.description} · ${lesson.questions.length} questões</p>
+          <p>${lesson.description} · ${lesson.questions.length} questões${done?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':''}</p>
         </div>
-        <div class="lesson-xp">+${lesson.xpReward} XP</div>
+        <div class="lesson-xp">${done?'<span style="color:var(--green);font-size:11px;font-weight:800;">Concluída</span>':'+'+lesson.xpReward+' XP'}</div>
       </div>
     `;
   });
@@ -6847,6 +6855,9 @@ async function submitProfileUpdate() {
 // ============================================================
 // NO LIVES BLOCK
 // ============================================================
+function showLessonDoneMsg() {
+  showToast('✅ Lição já concluída! Continue para a próxima.');
+}
 function showNoLivesModal() {
   const m = document.getElementById('modal-no-lives');
   m.classList.remove('hidden'); m.style.display = 'flex';
@@ -6923,6 +6934,50 @@ const HSE_MODULE = {
         { type:'truefalse', q:'O uso adequado de pausas e rodízio de funções é uma medida ergonômica que o Líder pode implementar para prevenir LER/DORT.',
           answer:true, explanation:'Correto. Pausas regulares e rodízio de funções reduzem a exposição repetitiva e previnem lesões musculoesqueléticas.' }
       ]
+    },
+    {
+      id: 'hse_l4', title: 'Regras de Ouro, Brigada e Combate a Incêndio',
+      description: 'Regras de Ouro HSE da Shopee, Brigada de Emergência, CIPA e uso de extintores',
+      xpReward: 140,
+      questions: [
+        { type:'multiple', q:'Qual das alternativas corresponde à Regra de Ouro nº 1 do HSE da Shopee?',
+          options:[
+            'Nunca opere equipamentos sem treinamento específico',
+            'Reporte todos os acidentes imediatamente à liderança',
+            'Segurança é um valor inegociável — sempre cuide de você e de seus colegas',
+            'Use os EPIs somente em áreas de alto risco'
+          ],
+          answer:2, explanation:'A Regra de Ouro nº 1 do HSE da Shopee estabelece que segurança é um valor inegociável: sempre cuide de você e de seus colegas.' },
+        { type:'truefalse', q:'Os membros da Brigada de Emergência são identificados por coletes ou braçadeiras VERMELHAS.',
+          answer:true, explanation:'Correto. Os membros da Brigada de Emergência usam coletes VERMELHOS. Os coletes ou braçadeiras VERDES identificam os membros da CIPA — não confunda!' },
+        { type:'truefalse', q:'Os membros da CIPA (Comissão Interna de Prevenção de Acidentes) são identificados por coletes ou braçadeiras VERDES.',
+          answer:true, explanation:'Correto. Os membros da CIPA usam coletes ou braçadeiras VERDES, enquanto a Brigada de Emergência usa coletes VERMELHOS.' },
+        { type:'order', q:'Ordene corretamente como usar um extintor de incêndio:',
+          steps:[
+            'Retire o pino de segurança',
+            'Aponte o bico na direção da BASE do fogo',
+            'Aperte o gatilho',
+            'Mantenha distância segura e mova o jato em movimentos laterais até apagar as chamas'
+          ],
+          correctOrder:[0,1,2,3],
+          explanation:'A ordem correta de uso do extintor é: 1) Retire o pino de segurança → 2) Aponte o bico na BASE do fogo → 3) Aperte o gatilho → 4) Mova em movimentos laterais mantendo distância segura.' },
+        { type:'multiple', q:'Qual é a diferença entre a Brigada de Emergência e a CIPA?',
+          options:[
+            'São a mesma equipe com nomes diferentes',
+            'A Brigada atua em emergências (incêndio, evacuação) e usa colete VERMELHO; a CIPA previne acidentes e usa colete VERDE',
+            'A CIPA combate incêndios; a Brigada faz a prevenção',
+            'Ambas usam coletes vermelhos e têm as mesmas funções'
+          ],
+          answer:1, explanation:'A Brigada de Emergência (colete VERMELHO) atua em situações de emergência como incêndios e evacuações. A CIPA (colete VERDE) tem foco em prevenção de acidentes e melhoria das condições de trabalho.' },
+        { type:'multiple', q:'Para qual parte do fogo deve ser direcionado o jato do extintor?',
+          options:[
+            'Para o topo das chamas, a fim de sufocar o fogo por cima',
+            'Para a base do fogo, onde está o material combustível',
+            'Para o centro das chamas com movimentos circulares',
+            'Para a fumaça, impedindo que o fogo se expanda'
+          ],
+          answer:1, explanation:'O jato do extintor deve sempre ser direcionado para a BASE do fogo, onde está o material combustível, e movido lateralmente para abafar as chamas de forma eficiente.' }
+      ]
     }
   ]
 };
@@ -6955,11 +7010,12 @@ function renderLeaderHome() {
     const blocked = !done && !locked && noLives;
     const numContent = done ? '✓' : (locked || blocked) ? '🔒' : (idx+1);
     const numClass   = done ? 'done' : (locked || blocked) ? 'locked-icon' : '';
-    const clickFn    = locked ? 'showLockedMsg()' : blocked ? 'showNoLivesModal()' : 'startLeaderLesson('+idx+')';
-    return '<div class="lesson-card' + (locked||blocked?' locked':'') + '" onclick="' + clickFn + '">' +
+    const clickFn    = done ? 'showLessonDoneMsg()' : locked ? 'showLockedMsg()' : blocked ? 'showNoLivesModal()' : 'startLeaderLesson('+idx+')';
+    const xpLabel    = done ? '<span style="color:var(--green);font-size:11px;font-weight:800;">Concluída</span>' : '+' + les.xpReward + ' XP';
+    return '<div class="lesson-card' + ((locked||blocked)?' locked':'') + '" onclick="' + clickFn + '">' +
       '<div class="lesson-num ' + numClass + '">' + numContent + '</div>' +
-      '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + les.description + '</p></div>' +
-      '<div class="lesson-xp">+' + les.xpReward + ' XP</div></div>';
+      '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + les.description + (done?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':'') + '</p></div>' +
+      '<div class="lesson-xp">' + xpLabel + '</div></div>';
   }).join('');
 
   let noLivesBanner = '';
@@ -6986,11 +7042,12 @@ function renderLeaderHome() {
         const lessBlocked = !lessDone && !lessLocked && noLives;
         const numContent = lessDone ? '✓' : (lessLocked || lessBlocked) ? '🔒' : (li+1);
         const numClass   = lessDone ? 'done' : (lessLocked || lessBlocked) ? 'locked-icon' : '';
-        const clickFn    = lessLocked ? 'showLockedMsg()' : lessBlocked ? 'showNoLivesModal()' : 'startLeaderRegularLesson('+mi+','+li+')';
-        return '<div class="lesson-card' + (lessLocked||lessBlocked?' locked':'') + '" onclick="' + clickFn + '">' +
+        const clickFn    = lessDone ? 'showLessonDoneMsg()' : lessLocked ? 'showLockedMsg()' : lessBlocked ? 'showNoLivesModal()' : 'startLeaderRegularLesson('+mi+','+li+')';
+        const xpLabel2   = lessDone ? '<span style="color:var(--green);font-size:11px;font-weight:800;">Concluída</span>' : '+' + les.xpReward + ' XP';
+        return '<div class="lesson-card' + ((lessLocked||lessBlocked)?' locked':'') + '" onclick="' + clickFn + '">' +
           '<div class="lesson-num ' + numClass + '">' + numContent + '</div>' +
-          '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + (les.description||'') + '</p></div>' +
-          '<div class="lesson-xp">+' + les.xpReward + ' XP</div></div>';
+          '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + (les.description||'') + (lessDone?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':'') + '</p></div>' +
+          '<div class="lesson-xp">' + xpLabel2 + '</div></div>';
       }).join('');
       return '<div class="module-card" style="margin-bottom:12px;">' +
         (isModDone ? '<span class="badge-complete">✓ Completo</span>' : '') +
@@ -7151,7 +7208,10 @@ function renderHSEQuestionList(lessonIdx) {
         <div style="font-size:12px;font-weight:700;line-height:1.4;">${q.q}</div>
         <div style="font-size:10px;color:var(--text2);margin-top:2px;">${q.type==='multiple'?'Múltipla Escolha':q.type==='truefalse'?'V ou F':'Ordenar'}</div>
       </div>
-      <button onclick="adminDeleteHSEQuestion(${lessonIdx},${qi})" style="flex-shrink:0;background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:6px;padding:4px 7px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;">🗑️</button>
+      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+        <button onclick="adminEditHSEQuestion(${lessonIdx},${qi})" style="background:#EBF5FB;border:1.5px solid #AED6F1;color:#2471A3;border-radius:6px;padding:4px 7px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;">✏️</button>
+        <button onclick="adminDeleteHSEQuestion(${lessonIdx},${qi})" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:6px;padding:4px 7px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;">🗑️</button>
+      </div>
     </div>
   `).join('');
 }
@@ -7167,6 +7227,95 @@ function adminDeleteHSEQuestion(lessonIdx, qi) {
   if(countEl) countEl.textContent = lesson.questions.length + ' pergunta(s) · ' + lesson.xpReward + ' XP';
   document.getElementById('adm-modules-list').innerHTML = renderAdminModulesList();
   showToast('🗑️ Pergunta HSE excluída.');
+}
+
+function adminEditHSEQuestion(lessonIdx, qi) {
+  const lesson = HSE_MODULE.lessons[lessonIdx];
+  if(!lesson) return;
+  const q = lesson.questions[qi];
+  if(!q) return;
+
+  // Reuse the same edit overlay logic as regular modules
+  const existing = document.getElementById('q-edit-overlay');
+  if(existing) existing.remove();
+
+  let optionsHtml = '';
+  if(q.type === 'multiple') {
+    optionsHtml = (q.options||[]).map((opt,oi) => `
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+        <input type="radio" name="hse-edit-correct" value="${oi}" ${q.answer===oi?'checked':''} style="flex-shrink:0;" />
+        <input type="text" id="hse-edit-opt-${oi}" value="${opt.replace(/"/g,'&quot;')}" style="flex:1;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:'Nunito',sans-serif;font-size:13px;" />
+      </div>`).join('');
+  } else if(q.type === 'truefalse') {
+    optionsHtml = `<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text2);">Resposta Correta:</div>
+      <div style="display:flex;gap:8px;">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;cursor:pointer;"><input type="radio" name="hse-edit-correct" value="true" ${q.answer===true?'checked':''}> ✅ Verdadeiro</label>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;cursor:pointer;"><input type="radio" name="hse-edit-correct" value="false" ${q.answer===false?'checked':''}> ❌ Falso</label>
+      </div>`;
+  } else if(q.type === 'order') {
+    optionsHtml = (q.steps||[]).map((step,si) => `
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+        <span style="background:var(--shopee);color:#fff;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:900;flex-shrink:0;">${si+1}</span>
+        <input type="text" id="hse-edit-step-${si}" value="${step.replace(/"/g,'&quot;')}" style="flex:1;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:'Nunito',sans-serif;font-size:13px;" />
+      </div>`).join('');
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'q-edit-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.2);">
+      <div style="background:linear-gradient(135deg,#E74C3C,#C0392B);border-radius:20px 20px 0 0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="color:#fff;font-weight:900;font-size:15px;">✏️ Editar Pergunta HSE</div>
+        <button onclick="document.getElementById('q-edit-overlay').remove()" style="background:rgba(255,255,255,0.2);border:none;border-radius:8px;padding:6px 10px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">✕</button>
+      </div>
+      <div style="padding:16px;">
+        <div style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;margin-bottom:6px;">Pergunta</div>
+        <textarea id="hse-edit-q-text" rows="3" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:600;resize:vertical;">${q.q}</textarea>
+        <div style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;margin-bottom:6px;margin-top:12px;">${q.type==='multiple'?'Opções (marque a correta)':q.type==='truefalse'?'Verdadeiro / Falso':'Etapas (ordem correta)'}</div>
+        ${optionsHtml}
+        <div style="font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;margin-bottom:6px;margin-top:12px;">Explicação</div>
+        <textarea id="hse-edit-explanation" rows="2" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:600;resize:vertical;">${q.explanation||''}</textarea>
+        <button onclick="adminSaveHSEQuestionEdit(${lessonIdx},${qi})" style="width:100%;margin-top:14px;padding:14px;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:900;cursor:pointer;">✅ Salvar Alterações</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function adminSaveHSEQuestionEdit(lessonIdx, qi) {
+  const lesson = HSE_MODULE.lessons[lessonIdx];
+  if(!lesson) return;
+  const q = lesson.questions[qi];
+  if(!q) return;
+
+  const newText = document.getElementById('hse-edit-q-text').value.trim();
+  if(!newText) { alert('O texto da pergunta não pode estar vazio.'); return; }
+  q.q = newText;
+  q.explanation = (document.getElementById('hse-edit-explanation').value||'').trim();
+
+  if(q.type === 'multiple') {
+    const correctRadio = document.querySelector('input[name="hse-edit-correct"]:checked');
+    if(!correctRadio) { alert('Selecione a opção correta.'); return; }
+    q.answer = parseInt(correctRadio.value);
+    q.options = q.options.map((_,oi) => {
+      const inp = document.getElementById('hse-edit-opt-'+oi);
+      return inp ? inp.value.trim() : q.options[oi];
+    });
+  } else if(q.type === 'truefalse') {
+    const correctRadio = document.querySelector('input[name="hse-edit-correct"]:checked');
+    if(!correctRadio) { alert('Selecione Verdadeiro ou Falso.'); return; }
+    q.answer = correctRadio.value === 'true';
+  } else if(q.type === 'order') {
+    q.steps = q.steps.map((_,si) => {
+      const inp = document.getElementById('hse-edit-step-'+si);
+      return inp ? inp.value.trim() : q.steps[si];
+    });
+  }
+
+  document.getElementById('q-edit-overlay').remove();
+  const listEl = document.getElementById('hse-q-list-' + lessonIdx);
+  if(listEl) listEl.innerHTML = renderHSEQuestionList(lessonIdx);
+  showToast('✅ Pergunta HSE atualizada!');
 }
 
 function adminClearAllQuestions_HSE(lessonIdx) {
@@ -7203,10 +7352,13 @@ window.submitProfileUpdate      = submitProfileUpdate;
 window.clearUsersFilters        = clearUsersFilters;
 window.adminOpenHSELesson       = adminOpenHSELesson;
 window.adminDeleteHSEQuestion   = adminDeleteHSEQuestion;
+window.adminEditHSEQuestion     = adminEditHSEQuestion;
+window.adminSaveHSEQuestionEdit = adminSaveHSEQuestionEdit;
 window.adminClearAllQuestions_HSE = adminClearAllQuestions_HSE;
 window.adminClearAllQuestions   = adminClearAllQuestions;
 window.renderHSEQuestionList    = renderHSEQuestionList;
 window.showNoLivesModal      = showNoLivesModal;
+window.showLessonDoneMsg     = showLessonDoneMsg;
 window.closeNoLivesModal     = closeNoLivesModal;
 window.hasLives              = hasLives;
 window.renderLeaderHome      = renderLeaderHome;
