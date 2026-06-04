@@ -3522,9 +3522,18 @@ function switchPage(page) {
 }
 function updateNavStats() {
   const u = state.currentUser;
-  document.getElementById('nav-streak').textContent = u.streak;
-  document.getElementById('nav-xp').textContent = u.xp;
-  document.getElementById('nav-lives').textContent = u.lives;
+  if (!u) return;
+  // Main screen nav stats
+  const navStreak = document.getElementById('nav-streak');
+  const navXp     = document.getElementById('nav-xp');
+  const navLives  = document.getElementById('nav-lives');
+  if (navStreak) navStreak.textContent = u.streak || 0;
+  if (navXp)     navXp.textContent     = (u.xp || 0).toLocaleString();
+  if (navLives)  navLives.textContent  = (u.lives !== undefined && u.lives !== null) ? u.lives : 5;
+  // Leader screen nav stats (separate elements)
+  if (u.position === 'Líder' && !u.isAdmin) {
+    updateLeaderNavStats();
+  }
 }
 
 // ============================================================
@@ -4279,7 +4288,7 @@ async function finishQuiz() {
       }
     }
   }
-  saveUser(u); // fire and forget
+  await saveUser(u); // await to guarantee Supabase write before showing result
   updateNavStats();
 
   // Show result
@@ -4289,6 +4298,9 @@ async function finishQuiz() {
   document.getElementById('result-xp').textContent = '+'+xpGained;
   document.getElementById('result-accuracy').textContent = accuracy+'%';
   document.getElementById('result-time').textContent = mins+':'+(secs<10?'0':'')+secs;
+
+  // Store leader flag so goHome() knows to redirect to the right screen
+  state._lastQuizWasLeader = (u.position === 'Líder' && !u.isAdmin);
 
   showScreen('screen-result');
   if(accuracy >= 70) launchConfetti();
@@ -4306,19 +4318,31 @@ async function quizFailed() {
   document.getElementById('result-xp').textContent = '+0';
   document.getElementById('result-accuracy').textContent = '—';
   document.getElementById('result-time').textContent = '—';
+  // Store leader flag so goHome() knows to redirect correctly
+  state._lastQuizWasLeader = (u.position === 'Líder' && !u.isAdmin);
   showScreen('screen-result');
 }
 
 function closeQuiz() {
   if(confirm('Tem certeza? Seu progresso nesta lição será perdido.')) {
-    showScreen('screen-main');
-    switchPage('home');
+    const u = state.currentUser;
+    if(u && u.position === 'Líder' && !u.isAdmin) {
+      updateLeaderNavStats();
+      renderLeaderHome();
+      showScreen('screen-leader');
+    } else {
+      showScreen('screen-main');
+      switchPage('home');
+    }
   }
 }
 
 function goHome() {
   const u = state.currentUser;
-  if(u && u.position === 'Líder' && !u.isAdmin) {
+  // Use stored flag (set by finishQuiz/quizFailed) or check user position directly
+  const isLeader = state._lastQuizWasLeader || (u && u.position === 'Líder' && !u.isAdmin);
+  state._lastQuizWasLeader = false;
+  if(isLeader) {
     updateLeaderNavStats();
     renderLeaderHome();
     showScreen('screen-leader');
