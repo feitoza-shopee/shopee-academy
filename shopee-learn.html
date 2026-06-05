@@ -3487,6 +3487,7 @@ function saveUsers() {
   Object.values(state.users).forEach(u => saveUser(u));
 }
 function saveModules() {
+  if (!Array.isArray(state.modules)) state.modules = [];
   localStorage.setItem('sa_modules', JSON.stringify(state.modules));
 }
 function showScreen(id) {
@@ -3767,7 +3768,15 @@ async function handleLogin() {
 
   await saveUser(user);
   state.currentUser = user;
-  state.modules = JSON.parse(localStorage.getItem('sa_modules'));
+  // Reload modules from localStorage (already seeded by initData).
+  // Guard against null/corrupt data — initData already ran, so state.modules is valid.
+  try {
+    const _raw = localStorage.getItem('sa_modules');
+    const _parsed = _raw ? JSON.parse(_raw) : null;
+    if (Array.isArray(_parsed) && _parsed.length > 0) state.modules = _parsed;
+    // else: keep state.modules as populated by initData
+  } catch(e) { /* keep state.modules from initData */ }
+  if (!Array.isArray(state.modules)) state.modules = [];
 
   hideLoading();
 
@@ -3809,6 +3818,7 @@ async function handleLogin() {
 // HOME
 // ============================================================
 function renderHome() {
+  if (!Array.isArray(state.modules)) state.modules = [];
   const u = state.currentUser;
   const totalLessons = state.modules.reduce((a,m) => a+m.lessons.length, 0);
   const completedCount = (u.completedLessons||[]).length;
@@ -4275,7 +4285,7 @@ async function finishQuiz() {
     u.completedLessons.push(lesson.id);
 
     // Recalculate completed modules count
-    const allMods = [...state.modules];
+    const allMods = [...(Array.isArray(state.modules) ? state.modules : [])];
     if(typeof HSE_MODULE !== 'undefined') allMods.push(HSE_MODULE);
     u.completedModules = allMods.filter(m => m.lessons.length > 0 && m.lessons.every(l => u.completedLessons.includes(l.id))).length;
 
@@ -7017,6 +7027,7 @@ function updateLeaderNavStats() {
 }
 
 function renderLeaderHome() {
+  if (!Array.isArray(state.modules)) state.modules = [];
   const u   = state.currentUser;
   const el  = document.getElementById('page-leader-home');
   if(!el) return;
