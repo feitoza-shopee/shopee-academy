@@ -3476,11 +3476,10 @@ async function saveUser(user) {
     completed_lessons: JSON.stringify(user.completedLessons || []),
     is_admin: user.isAdmin || false,
     total_accesses: user.totalAccesses || 0,
-    questions_answered: user.questionsAnswered || 0,
-    completed_modules: user.completedModules || 0
+    questions_answered: user.questionsAnswered || 0
   };
   const { error } = await getDB().from('users').upsert(row, { onConflict: 'id' });
-  if(error) console.error('saveUser error:', error);
+  if(error) console.error('saveUser error — code:', error.code, '| message:', error.message, '| details:', error.details, '| hint:', error.hint, '| full:', JSON.stringify(error));
 }
 function saveUsers() {
   // Legacy: save all users to Supabase
