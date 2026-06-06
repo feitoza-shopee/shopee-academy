@@ -1636,13 +1636,13 @@ async function initData() {
                 type:'multiple',
                 q:'Qual das alternativas corresponde à Regra de Ouro nº 1 do HSE da Shopee?',
                 options:[
-                  'Eu nunca me posiciono na área da doca durante a manobra de veículos',
                   'Eu só começo a carga ou descarga após posicionar o calço nas rodas e guardar a chave do veículo',
-                  'Eu sempre cuido da minha segurança ao movimentar pacotes, pallets e gaiolas',
+                  'Eu nunca me posiciono na área da doca durante a manobra de veículos',
+                  'Segurança é um valor inegociável: sempre cuide de você e de seus colegas',
                   'Eu nunca desativo dispositivos de segurança sem autorização'
                 ],
-                answer:1,
-                explanation:'Regra de Ouro nº 1: “Eu só começo a carga ou descarga após posicionar corretamente o calço nas rodas e guardar a chave do veículo.”'
+                answer:2,
+                explanation:'A Regra de Ouro nº 1 do HSE da Shopee é: “Segurança é um valor inegociável, por isso sempre cuide de você e de seus colegas.”'
               },
               {
                 type:'multiple',
@@ -1659,8 +1659,8 @@ async function initData() {
               {
                 type:'truefalse',
                 q:'Os membros da Brigada de Emergência são identificados por coletes vermelhos.',
-                answer:false,
-                explanation:'Incorreto. Os membros da Brigada de Emergência usam coletes VERDES. Os coletes ou braçadeiras vermelhas identificam os membros da CIPA.'
+                answer:true,
+                explanation:'Correto. Os membros da Brigada de Emergência usam coletes VERMELHOS. Os coletes ou braçadeiras VERDES identificam os membros da CIPA — não confunda!'
               },
               {
                 type:'multiple',
@@ -1726,13 +1726,13 @@ async function initData() {
                 type:'order',
                 q:'Ordene corretamente como usar um extintor de incêndio:',
                 steps:[
-                  'Apontar o bico na direção da base do fogo',
                   'Retirar o pino de segurança',
-                  'Apertar o gatilho e mover o jato em movimentos laterais',
-                  'Manter distância segura até apagar as chamas'
+                  'Apontar o bico na direção da base do fogo',
+                  'Apertar o gatilho',
+                  'Manter distância segura e mover o jato em movimentos laterais até apagar as chamas'
                 ],
-                correctOrder:[1,0,2,3],
-                explanation:'Sequência correta: Retirar o pino → Apontar o bico na base do fogo → Apertar o gatilho com movimentos laterais → Manter distância até apagar as chamas.'
+                correctOrder:[0,1,2,3],
+                explanation:'Sequência correta: 1) Retire o pino de segurança → 2) Aponte o bico na BASE do fogo → 3) Aperte o gatilho → 4) Mantenha distância segura e mova em movimentos laterais até apagar as chamas.'
               }
             ]
           },
@@ -3915,12 +3915,18 @@ function openModule(modId) {
     const isLocked = !state.currentUser.isAdmin && li > 0 && !(u.completedLessons||[]).includes(mod.lessons[li-1].id);
     const noLives = !hasLives();
     const blocked = !done && !isLocked && noLives;
+    const inProgress = !done && !isLocked && !blocked &&
+      !!localStorage.getItem('sa_qprog_' + u.id + '_' + lesson.id);
 
     let clickFn = '';
     if(done) clickFn = 'showLessonDoneMsg()';
     else if(isLocked) clickFn = '';
     else if(blocked) clickFn = 'showNoLivesModal()';
     else clickFn = 'startLesson(\''+mod.id+'\',\''+lesson.id+'\')';
+
+    const progressBadge = inProgress
+      ? '<span style="color:var(--shopee);font-weight:800;font-size:11px;margin-left:4px;">▶ Continuar</span>'
+      : '';
 
     html += `
       <div class="lesson-card${(isLocked||blocked)?' locked':''}" onclick="${clickFn}">
@@ -3929,7 +3935,7 @@ function openModule(modId) {
         </div>
         <div class="lesson-info">
           <h4>${lesson.title}</h4>
-          <p>${lesson.description} · ${lesson.questions.length} questões${done?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':''}</p>
+          <p>${lesson.description} · ${lesson.questions.length} questões${done?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':''}${progressBadge}</p>
         </div>
         <div class="lesson-xp">${done?'<span style="color:var(--green);font-size:11px;font-weight:800;">Concluída</span>':'+'+lesson.xpReward+' XP'}</div>
       </div>
@@ -3947,6 +3953,26 @@ function backToHome() {
 // ============================================================
 // QUIZ
 // ============================================================
+function _quizProgressKey(lessonId) {
+  return 'sa_qprog_' + (state.currentUser ? state.currentUser.id : 'x') + '_' + lessonId;
+}
+function saveQuizProgress() {
+  const q = state.quiz;
+  if(!q || !state.currentLesson) return;
+  const key = _quizProgressKey(state.currentLesson.id);
+  localStorage.setItem(key, JSON.stringify({
+    current: q.current,
+    lives: q.lives,
+    errors: q.errors,
+    correct: q.correct,
+    answered: q.answered,
+    selectedAnswer: q.selectedAnswer
+  }));
+}
+function clearQuizProgress(lessonId) {
+  localStorage.removeItem(_quizProgressKey(lessonId));
+}
+
 function startLesson(modId, lessonId) {
   if(!hasLives()) { showNoLivesModal(); return; }
   const mod = state.modules.find(m => m.id===modId);
@@ -3954,12 +3980,17 @@ function startLesson(modId, lessonId) {
   state.currentModule = mod;
   state.currentLesson = lesson;
 
+  // Try to resume saved progress
+  const savedRaw = localStorage.getItem(_quizProgressKey(lessonId));
+  let savedProgress = null;
+  try { savedProgress = savedRaw ? JSON.parse(savedRaw) : null; } catch(e) {}
+
   state.quiz = {
     questions: [...lesson.questions],
-    current: 0,
-    lives: state.currentUser.lives,
-    errors: 0,
-    correct: 0,
+    current: savedProgress ? savedProgress.current : 0,
+    lives: savedProgress ? savedProgress.lives : state.currentUser.lives,
+    errors: savedProgress ? savedProgress.errors : 0,
+    correct: savedProgress ? savedProgress.correct : 0,
     startTime: Date.now(),
     selectedAnswer: null,
     answered: false
@@ -4251,6 +4282,7 @@ function showFeedback(correct, explanation) {
 function nextQuestion() {
   state.quiz.current++;
   if(state.quiz.lives <= 0) { quizFailed(); return; }
+  saveQuizProgress();
   renderQuestion();
 }
 
@@ -4263,14 +4295,16 @@ async function finishQuiz() {
   const secs = elapsed%60;
   const accuracy = Math.round(q.correct/q.questions.length*100);
 
-  // Calculate XP — admins não pontuam no ranking
-  let xpGained = lesson.xpReward;
-  if(accuracy===100) xpGained = Math.round(xpGained * 1.5); // bonus
+  // Calculate XP — only awarded on 100% accuracy (lesson completion)
+  let xpGained = 0;
+  if(accuracy === 100) {
+    xpGained = Math.round(lesson.xpReward * 1.5); // 1.5× bonus for perfect score
+  }
 
-  if(!u.isAdmin) {
+  if(!u.isAdmin && xpGained > 0) {
     u.xp += xpGained;
   } else {
-    xpGained = 0; // admin não acumula XP
+    xpGained = 0;
   }
   u.lives = q.lives;
 
@@ -4283,8 +4317,8 @@ async function finishQuiz() {
     u.questionsAnswered = (u.questionsAnswered || 0) + q.questions.length;
   }
 
-  // Mark lesson complete
-  if(!(u.completedLessons||[]).includes(lesson.id)) {
+  // Mark lesson complete ONLY if all questions answered correctly (100% accuracy)
+  if(accuracy === 100 && !(u.completedLessons||[]).includes(lesson.id)) {
     if(!u.completedLessons) u.completedLessons = [];
     u.completedLessons.push(lesson.id);
 
@@ -4302,13 +4336,17 @@ async function finishQuiz() {
       }
     }
   }
+
   await saveUser(u); // await to guarantee Supabase write before showing result
+  clearQuizProgress(lesson.id); // always clear saved progress on quiz end (restart fresh next time)
   updateNavStats();
 
   // Show result
   document.getElementById('result-trophy').textContent = accuracy===100?'🏆':accuracy>=70?'🌟':'📚';
-  document.getElementById('result-title').textContent = accuracy===100?'Perfeito!':accuracy>=70?'Muito Bem!':'Continue Tentando!';
-  document.getElementById('result-subtitle').textContent = accuracy===100?'Você gabaritou a lição!':accuracy>=70?'Ótimo desempenho!':'Revise o material e tente novamente.';
+  document.getElementById('result-title').textContent   = accuracy===100?'Perfeito!':accuracy>=70?'Quase lá!':'Continue Tentando!';
+  document.getElementById('result-subtitle').textContent = accuracy===100
+    ? 'Lição concluída! A próxima foi desbloqueada. 🔓'
+    : 'Você precisa de 100% para concluir a lição e desbloquear a próxima. Tente novamente!';
   document.getElementById('result-xp').textContent = '+'+xpGained;
   document.getElementById('result-accuracy').textContent = accuracy+'%';
   document.getElementById('result-time').textContent = mins+':'+(secs<10?'0':'')+secs;
@@ -4317,13 +4355,14 @@ async function finishQuiz() {
   state._lastQuizWasLeader = (u.position === 'Líder' && !u.isAdmin);
 
   showScreen('screen-result');
-  if(accuracy >= 70) launchConfetti();
+  if(accuracy === 100) launchConfetti();
 }
 
 async function quizFailed() {
   const u = state.currentUser;
   u.lives = 0;
   await saveUser(u);
+  if(state.currentLesson) clearQuizProgress(state.currentLesson.id);
   updateNavStats();
 
   document.getElementById('result-trophy').textContent = '💔';
@@ -7047,13 +7086,15 @@ function renderLeaderHome() {
     const done   = (u.completedLessons||[]).includes(les.id);
     const locked = idx > 0 && !(u.completedLessons||[]).includes(mod.lessons[idx-1].id);
     const blocked = !done && !locked && noLives;
+    const inProgress = !done && !locked && !blocked && !!localStorage.getItem('sa_qprog_' + u.id + '_' + les.id);
     const numContent = done ? '✓' : (locked || blocked) ? '🔒' : (idx+1);
     const numClass   = done ? 'done' : (locked || blocked) ? 'locked-icon' : '';
     const clickFn    = done ? 'showLessonDoneMsg()' : locked ? 'showLockedMsg()' : blocked ? 'showNoLivesModal()' : 'startLeaderLesson('+idx+')';
     const xpLabel    = done ? '<span style="color:var(--green);font-size:11px;font-weight:800;">Concluída</span>' : '+' + les.xpReward + ' XP';
+    const progressBadge = inProgress ? ' · <span style="color:var(--shopee);font-weight:800;font-size:11px;">▶ Continuar</span>' : '';
     return '<div class="lesson-card' + ((locked||blocked)?' locked':'') + '" onclick="' + clickFn + '">' +
       '<div class="lesson-num ' + numClass + '">' + numContent + '</div>' +
-      '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + les.description + (done?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':'') + '</p></div>' +
+      '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + les.description + (done?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':'') + progressBadge + '</p></div>' +
       '<div class="lesson-xp">' + xpLabel + '</div></div>';
   }).join('');
 
@@ -7079,13 +7120,15 @@ function renderLeaderHome() {
         const lessDone   = (u.completedLessons||[]).includes(les.id);
         const lessLocked = li > 0 && !(u.completedLessons||[]).includes(rm.lessons[li-1].id);
         const lessBlocked = !lessDone && !lessLocked && noLives;
+        const lessInProgress = !lessDone && !lessLocked && !lessBlocked && !!localStorage.getItem('sa_qprog_' + u.id + '_' + les.id);
         const numContent = lessDone ? '✓' : (lessLocked || lessBlocked) ? '🔒' : (li+1);
         const numClass   = lessDone ? 'done' : (lessLocked || lessBlocked) ? 'locked-icon' : '';
         const clickFn    = lessDone ? 'showLessonDoneMsg()' : lessLocked ? 'showLockedMsg()' : lessBlocked ? 'showNoLivesModal()' : 'startLeaderRegularLesson('+mi+','+li+')';
         const xpLabel2   = lessDone ? '<span style="color:var(--green);font-size:11px;font-weight:800;">Concluída</span>' : '+' + les.xpReward + ' XP';
+        const progressBadge2 = lessInProgress ? ' · <span style="color:var(--shopee);font-weight:800;font-size:11px;">▶ Continuar</span>' : '';
         return '<div class="lesson-card' + ((lessLocked||lessBlocked)?' locked':'') + '" onclick="' + clickFn + '">' +
           '<div class="lesson-num ' + numClass + '">' + numContent + '</div>' +
-          '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + (les.description||'') + (lessDone?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':'') + '</p></div>' +
+          '<div class="lesson-info"><h4>' + les.title + '</h4><p>' + (les.description||'') + (lessDone?' · <span style="color:var(--green);font-weight:800;">✅ Concluída</span>':'') + progressBadge2 + '</p></div>' +
           '<div class="lesson-xp">' + xpLabel2 + '</div></div>';
       }).join('');
       return '<div class="module-card" style="margin-bottom:12px;">' +
@@ -7132,11 +7175,15 @@ function startLeaderLesson(lessonIdx) {
   if(!les) return;
   state.currentModule = mod;
   state.currentLesson = les;
+  const _savedRaw = localStorage.getItem(_quizProgressKey(les.id));
+  let _saved = null;
+  try { _saved = _savedRaw ? JSON.parse(_savedRaw) : null; } catch(e) {}
   state.quiz = {
     questions: [...les.questions],
-    current: 0,
-    lives: (state.currentUser.lives !== undefined && state.currentUser.lives !== null) ? state.currentUser.lives : 5,
-    errors: 0, correct: 0,
+    current: _saved ? _saved.current : 0,
+    lives: _saved ? _saved.lives : ((state.currentUser.lives !== undefined && state.currentUser.lives !== null) ? state.currentUser.lives : 5),
+    errors: _saved ? _saved.errors : 0,
+    correct: _saved ? _saved.correct : 0,
     startTime: Date.now(),
     selectedAnswer: null, answered: false
   };
@@ -7152,11 +7199,15 @@ function startLeaderRegularLesson(modIdx, lessonIdx) {
   if(!les) return;
   state.currentModule = mod;
   state.currentLesson = les;
+  const _savedRaw2 = localStorage.getItem(_quizProgressKey(les.id));
+  let _saved2 = null;
+  try { _saved2 = _savedRaw2 ? JSON.parse(_savedRaw2) : null; } catch(e) {}
   state.quiz = {
     questions: [...les.questions],
-    current: 0,
-    lives: (state.currentUser.lives !== undefined && state.currentUser.lives !== null) ? state.currentUser.lives : 5,
-    errors: 0, correct: 0,
+    current: _saved2 ? _saved2.current : 0,
+    lives: _saved2 ? _saved2.lives : ((state.currentUser.lives !== undefined && state.currentUser.lives !== null) ? state.currentUser.lives : 5),
+    errors: _saved2 ? _saved2.errors : 0,
+    correct: _saved2 ? _saved2.correct : 0,
     startTime: Date.now(),
     selectedAnswer: null, answered: false
   };
