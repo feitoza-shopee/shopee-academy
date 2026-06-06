@@ -1354,8 +1354,8 @@ function rowToUser(row) {
     completedLessons: (() => { try { return JSON.parse(row.completed_lessons || '[]'); } catch(e) { return []; } })(),
     isAdmin: row.is_admin || false,
     totalAccesses: row.total_accesses || 0,
-    questionsAnswered: row.questions_answered || 0,
-    completedModules: row.completed_modules || 0
+    questionsAnswered: 0,
+    completedModules: 0
   };
 }
 
@@ -3475,8 +3475,7 @@ async function saveUser(user) {
     last_active: user.lastActive || today(),
     completed_lessons: JSON.stringify(user.completedLessons || []),
     is_admin: user.isAdmin || false,
-    total_accesses: user.totalAccesses || 0,
-    questions_answered: user.questionsAnswered || 0
+    total_accesses: user.totalAccesses || 0
   };
   const { error } = await getDB().from('users').upsert(row, { onConflict: 'id' });
   if(error) console.error('saveUser error — code:', error.code, '| message:', error.message, '| details:', error.details, '| hint:', error.hint, '| full:', JSON.stringify(error));
@@ -3776,6 +3775,12 @@ async function handleLogin() {
     // else: keep state.modules as populated by initData
   } catch(e) { /* keep state.modules from initData */ }
   if (!Array.isArray(state.modules)) state.modules = [];
+
+  // Recalculate derived counters (not stored in DB) from completedLessons + modules
+  const _allLessons = state.modules.flatMap(m => m.lessons || []);
+  const _doneLessonIds = new Set(user.completedLessons || []);
+  user.questionsAnswered = _allLessons.filter(l => _doneLessonIds.has(l.id)).reduce((acc, l) => acc + (l.questions ? l.questions.length : 0), 0);
+  user.completedModules  = state.modules.filter(m => (m.lessons||[]).length > 0 && (m.lessons||[]).every(l => _doneLessonIds.has(l.id))).length;
 
   hideLoading();
 
