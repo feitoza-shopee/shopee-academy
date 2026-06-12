@@ -3443,15 +3443,37 @@ async function initData() {
       },
     ];
 
-  // Always ensure all pdfModules are present (merge with any admin-created modules)
+  // Tenta carregar módulos do Supabase (editados pelo admin) — com fallback para localStorage
   {
-    const existing = JSON.parse(localStorage.getItem('sa_modules') || '[]');
-    const adminOnly = existing.filter(m => !pdfModules.some(p => p.id === m.id));
-    const merged = [...pdfModules, ...adminOnly];
-    localStorage.setItem('sa_modules', JSON.stringify(merged));
+    let remoteModules = null;
+    try {
+      const { data: cfgRow } = await getDB().from('app_config').select('value').eq('key', 'modules').single();
+      if(cfgRow && cfgRow.value) remoteModules = JSON.parse(cfgRow.value);
+    } catch(e) {}
+
+    if(remoteModules && Array.isArray(remoteModules) && remoteModules.length > 0) {
+      // Usa os módulos do Supabase como base e garante que pdfModules base estejam presentes
+      const adminOnly = remoteModules.filter(m => !pdfModules.some(p => p.id === m.id));
+      const merged = [...pdfModules.map(pm => {
+        // Se o admin editou um pdfModule (ex: reordenou lições, alterou perguntas), usa a versão remota
+        const remote = remoteModules.find(r => r.id === pm.id);
+        return remote ? remote : pm;
+      }), ...adminOnly];
+      state.modules = merged;
+      localStorage.setItem('sa_modules', JSON.stringify(merged));
+    } else {
+      // Fallback: usa localStorage ou pdfModules padrão
+      const existing = JSON.parse(localStorage.getItem('sa_modules') || '[]');
+      const adminOnly = existing.filter(m => !pdfModules.some(p => p.id === m.id));
+      const merged = [...pdfModules, ...adminOnly];
+      state.modules = merged;
+      localStorage.setItem('sa_modules', JSON.stringify(merged));
+      // Persiste no Supabase para próximas sessões
+      getDB().from('app_config').upsert({ key: 'modules', value: JSON.stringify(merged) }, { onConflict: 'key' })
+        .catch(e => {});
+    }
     localStorage.setItem('sa_modules_version', PDF_MODULES_VERSION);
   }
-  state.modules = JSON.parse(localStorage.getItem('sa_modules'));
 }
 
 // ============================================================
@@ -3487,6 +3509,19 @@ function saveUsers() {
 function saveModules() {
   if (!Array.isArray(state.modules)) state.modules = [];
   localStorage.setItem('sa_modules', JSON.stringify(state.modules));
+  // Persiste no Supabase para que TODOS os usuários vejam as alterações
+  getDB().from('app_config').upsert({ key: 'modules', value: JSON.stringify(state.modules) }, { onConflict: 'key' })
+    .then(({ error }) => { if(error) console.error('saveModules Supabase error:', error.message); });
+}
+
+async function loadModulesFromSupabase() {
+  try {
+    const { data, error } = await getDB().from('app_config').select('value').eq('key', 'modules').single();
+    if(!error && data && data.value) {
+      return JSON.parse(data.value);
+    }
+  } catch(e) {}
+  return null;
 }
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -3766,14 +3801,24 @@ async function handleLogin() {
 
   await saveUser(user);
   state.currentUser = user;
-  // Reload modules from localStorage (already seeded by initData).
-  // Guard against null/corrupt data — initData already ran, so state.modules is valid.
+  // Recarrega módulos do Supabase ao fazer login para garantir que o usuário veja as últimas alterações do admin
   try {
-    const _raw = localStorage.getItem('sa_modules');
-    const _parsed = _raw ? JSON.parse(_raw) : null;
-    if (Array.isArray(_parsed) && _parsed.length > 0) state.modules = _parsed;
-    // else: keep state.modules as populated by initData
-  } catch(e) { /* keep state.modules from initData */ }
+    const { data: cfgRow } = await getDB().from('app_config').select('value').eq('key', 'modules').single();
+    if(cfgRow && cfgRow.value) {
+      const remoteModules = JSON.parse(cfgRow.value);
+      if(Array.isArray(remoteModules) && remoteModules.length > 0) {
+        state.modules = remoteModules;
+        localStorage.setItem('sa_modules', JSON.stringify(remoteModules));
+      }
+    }
+  } catch(e) {
+    // fallback: usa localStorage
+    try {
+      const _raw = localStorage.getItem('sa_modules');
+      const _parsed = _raw ? JSON.parse(_raw) : null;
+      if (Array.isArray(_parsed) && _parsed.length > 0) state.modules = _parsed;
+    } catch(e2) {}
+  }
   if (!Array.isArray(state.modules)) state.modules = [];
 
   // Recalculate derived counters (not stored in DB) from completedLessons + modules
@@ -7557,15 +7602,44 @@ window.renderRankingByPosition = renderRankingByPosition;
 window.switchRankingTab      = switchRankingTab;
 
 function adminSaveModules() {
-  saveModules();
   const btn = document.getElementById('btn-save-modules');
   if(btn) {
-    const orig = btn.innerHTML;
-    btn.innerHTML = '✅ Salvo!';
-    btn.style.background = 'linear-gradient(135deg,#2ECC71,#27AE60)';
-    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    btn.innerHTML = '⏳ Salvando...';
+    btn.disabled = true;
+    btn.style.background = 'linear-gradient(135deg,#95A5A6,#7F8C8D)';
   }
-  showToast('💾 Módulos e lições salvos com sucesso!');
+
+  // saveModules salva no localStorage E no Supabase
+  saveModules();
+
+  // Aguarda um tick para dar feedback após o upsert disparar
+  setTimeout(async () => {
+    // Confirma que o Supabase recebeu
+    try {
+      const { data, error } = await getDB().from('app_config').select('value').eq('key', 'modules').single();
+      if(!error && data) {
+        if(btn) {
+          btn.innerHTML = '✅ Salvo!';
+          btn.style.background = 'linear-gradient(135deg,#2ECC71,#27AE60)';
+          btn.disabled = false;
+          setTimeout(() => { btn.innerHTML = '💾 Salvar Alterações'; btn.style.background = ''; }, 2500);
+        }
+        showToast('💾 Alterações salvas! Todos os usuários verão as mudanças.');
+        renderHome();
+      } else {
+        throw new Error('Sem confirmação do Supabase');
+      }
+    } catch(e) {
+      if(btn) {
+        btn.innerHTML = '⚠️ Erro ao salvar';
+        btn.style.background = 'linear-gradient(135deg,#E74C3C,#C0392B)';
+        btn.disabled = false;
+        setTimeout(() => { btn.innerHTML = '💾 Salvar Alterações'; btn.style.background = ''; }, 3000);
+      }
+      showToast('⚠️ Erro ao sincronizar com o servidor. Tente novamente.');
+      console.error('adminSaveModules Supabase confirm error:', e);
+    }
+  }, 800);
 }
 window.adminSaveModules = adminSaveModules;
 </script>
