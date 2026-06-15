@@ -3447,9 +3447,17 @@ async function initData() {
   {
     let remoteModules = null;
     try {
-      const { data: cfgRow } = await getDB().from('app_config').select('value').eq('key', 'modules').single();
-      if(cfgRow && cfgRow.value) remoteModules = JSON.parse(cfgRow.value);
-    } catch(e) {}
+      // Timeout de 3s para não travar o boot se a tabela app_config ainda não existir
+      const timeoutPromise = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000));
+      const fetchPromise = getDB().from('app_config').select('value').eq('key', 'modules').single();
+      const { data: cfgRow } = await Promise.race([fetchPromise, timeoutPromise]);
+      if(cfgRow && cfgRow.value) {
+        try { remoteModules = JSON.parse(cfgRow.value); } catch(pe) { remoteModules = null; }
+      }
+    } catch(e) {
+      // Tabela não existe ainda, timeout ou erro de rede — usa fallback
+      remoteModules = null;
+    }
 
     if(remoteModules && Array.isArray(remoteModules) && remoteModules.length > 0) {
       // Usa os módulos do Supabase como base e garante que pdfModules base estejam presentes
@@ -3463,14 +3471,24 @@ async function initData() {
       localStorage.setItem('sa_modules', JSON.stringify(merged));
     } else {
       // Fallback: usa localStorage ou pdfModules padrão
-      const existing = JSON.parse(localStorage.getItem('sa_modules') || '[]');
+      let existing = [];
+      try {
+        const raw = localStorage.getItem('sa_modules');
+        if(raw) existing = JSON.parse(raw);
+        if(!Array.isArray(existing)) existing = [];
+      } catch(e) {
+        console.warn('sa_modules corrompido no localStorage, limpando...', e.message);
+        localStorage.removeItem('sa_modules');
+        existing = [];
+      }
       const adminOnly = existing.filter(m => !pdfModules.some(p => p.id === m.id));
       const merged = [...pdfModules, ...adminOnly];
       state.modules = merged;
       localStorage.setItem('sa_modules', JSON.stringify(merged));
-      // Persiste no Supabase para próximas sessões
+      // Tenta persistir no Supabase em background (não bloqueia o boot)
       getDB().from('app_config').upsert({ key: 'modules', value: JSON.stringify(merged) }, { onConflict: 'key' })
-        .catch(e => {});
+        .then(({ error }) => { if(error) console.warn('app_config não disponível ainda:', error.message); })
+        .catch(() => {});
     }
     localStorage.setItem('sa_modules_version', PDF_MODULES_VERSION);
   }
@@ -3803,21 +3821,27 @@ async function handleLogin() {
   state.currentUser = user;
   // Recarrega módulos do Supabase ao fazer login para garantir que o usuário veja as últimas alterações do admin
   try {
-    const { data: cfgRow } = await getDB().from('app_config').select('value').eq('key', 'modules').single();
+    const _timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000));
+    const _fetch = getDB().from('app_config').select('value').eq('key', 'modules').single();
+    const { data: cfgRow } = await Promise.race([_fetch, _timeout]);
     if(cfgRow && cfgRow.value) {
-      const remoteModules = JSON.parse(cfgRow.value);
+      let remoteModules = null;
+      try { remoteModules = JSON.parse(cfgRow.value); } catch(pe) {}
       if(Array.isArray(remoteModules) && remoteModules.length > 0) {
         state.modules = remoteModules;
         localStorage.setItem('sa_modules', JSON.stringify(remoteModules));
       }
     }
   } catch(e) {
-    // fallback: usa localStorage
+    // fallback: usa localStorage (tabela ainda não existe ou timeout)
     try {
       const _raw = localStorage.getItem('sa_modules');
       const _parsed = _raw ? JSON.parse(_raw) : null;
       if (Array.isArray(_parsed) && _parsed.length > 0) state.modules = _parsed;
-    } catch(e2) {}
+    } catch(e2) {
+      console.warn('sa_modules corrompido no localStorage (login), limpando...');
+      localStorage.removeItem('sa_modules');
+    }
   }
   if (!Array.isArray(state.modules)) state.modules = [];
 
@@ -7601,7 +7625,7 @@ async function leaderRenderRankingByPosition() {
 window.renderRankingByPosition = renderRankingByPosition;
 window.switchRankingTab      = switchRankingTab;
 
-function adminSaveModules() {
+async function adminSaveModules() {
   const btn = document.getElementById('btn-save-modules');
   if(btn) {
     btn.innerHTML = '⏳ Salvando...';
@@ -7609,37 +7633,38 @@ function adminSaveModules() {
     btn.style.background = 'linear-gradient(135deg,#95A5A6,#7F8C8D)';
   }
 
-  // saveModules salva no localStorage E no Supabase
-  saveModules();
+  // Salva no localStorage imediatamente
+  if (!Array.isArray(state.modules)) state.modules = [];
+  localStorage.setItem('sa_modules', JSON.stringify(state.modules));
 
-  // Aguarda um tick para dar feedback após o upsert disparar
-  setTimeout(async () => {
-    // Confirma que o Supabase recebeu
-    try {
-      const { data, error } = await getDB().from('app_config').select('value').eq('key', 'modules').single();
-      if(!error && data) {
-        if(btn) {
-          btn.innerHTML = '✅ Salvo!';
-          btn.style.background = 'linear-gradient(135deg,#2ECC71,#27AE60)';
-          btn.disabled = false;
-          setTimeout(() => { btn.innerHTML = '💾 Salvar Alterações'; btn.style.background = ''; }, 2500);
-        }
-        showToast('💾 Alterações salvas! Todos os usuários verão as mudanças.');
-        renderHome();
-      } else {
-        throw new Error('Sem confirmação do Supabase');
-      }
-    } catch(e) {
-      if(btn) {
-        btn.innerHTML = '⚠️ Erro ao salvar';
-        btn.style.background = 'linear-gradient(135deg,#E74C3C,#C0392B)';
-        btn.disabled = false;
-        setTimeout(() => { btn.innerHTML = '💾 Salvar Alterações'; btn.style.background = ''; }, 3000);
-      }
-      showToast('⚠️ Erro ao sincronizar com o servidor. Tente novamente.');
-      console.error('adminSaveModules Supabase confirm error:', e);
+  // Tenta salvar no Supabase com timeout de 5s
+  let supabaseOk = false;
+  try {
+    const _upsert = getDB().from('app_config')
+      .upsert({ key: 'modules', value: JSON.stringify(state.modules) }, { onConflict: 'key' });
+    const _timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000));
+    const { error } = await Promise.race([_upsert, _timeout]);
+    supabaseOk = !error;
+    if(error) console.warn('adminSaveModules upsert error:', error.message);
+  } catch(e) {
+    console.warn('adminSaveModules Supabase indisponível:', e.message);
+  }
+
+  if(btn) {
+    if(supabaseOk) {
+      btn.innerHTML = '✅ Salvo!';
+      btn.style.background = 'linear-gradient(135deg,#2ECC71,#27AE60)';
+      showToast('💾 Alterações salvas! Todos os usuários verão as mudanças.');
+    } else {
+      btn.innerHTML = '⚠️ Salvo só localmente';
+      btn.style.background = 'linear-gradient(135deg,#E67E22,#D35400)';
+      showToast('⚠️ Salvo localmente. Crie a tabela app_config no Supabase para sincronizar com todos.');
     }
-  }, 800);
+    btn.disabled = false;
+    setTimeout(() => { btn.innerHTML = '💾 Salvar Alterações'; btn.style.background = ''; }, 3000);
+  }
+
+  renderHome();
 }
 window.adminSaveModules = adminSaveModules;
 </script>
