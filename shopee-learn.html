@@ -1350,8 +1350,10 @@ function rowToUser(row) {
     xp: row.xp || 0,
     streak: row.streak || 0,
     lives: (row.lives !== undefined && row.lives !== null) ? row.lives : 5,
+    livesDate: row.lives_date || '', // data em que as vidas foram esgotadas/usadas pela última vez
     lastActive: row.last_active || today(),
     completedLessons: (() => { try { return JSON.parse(row.completed_lessons || '[]'); } catch(e) { return []; } })(),
+    quizProgress: (() => { try { return row.quiz_progress ? JSON.parse(row.quiz_progress) : null; } catch(e) { return null; } })(),
     isAdmin: row.is_admin || false,
     totalAccesses: row.total_accesses || 0,
     questionsAnswered: 0,
@@ -3443,6 +3445,12 @@ async function initData() {
       },
     ];
 
+  // HSE é obrigatório e deve ser o primeiro módulo da trilha para TODOS os usuários.
+  // Reaproveita a definição existente de HSE_MODULE (antes exclusiva da tela de Líder).
+  if(typeof HSE_MODULE !== 'undefined' && !pdfModules.some(m => m.id === HSE_MODULE.id)) {
+    pdfModules.unshift(HSE_MODULE);
+  }
+
   // Tenta carregar módulos do Supabase (editados pelo admin) — com fallback para localStorage
   {
     let remoteModules = null;
@@ -3512,13 +3520,27 @@ async function saveUser(user) {
     xp: user.xp || 0,
     streak: user.streak || 0,
     lives: (user.lives !== undefined && user.lives !== null) ? user.lives : 5,
+    lives_date: user.livesDate || '',
     last_active: user.lastActive || today(),
     completed_lessons: JSON.stringify(user.completedLessons || []),
+    quiz_progress: user.quizProgress ? JSON.stringify(user.quizProgress) : null,
     is_admin: user.isAdmin || false,
     total_accesses: user.totalAccesses || 0
   };
-  const { error } = await getDB().from('users').upsert(row, { onConflict: 'id' });
-  if(error) console.error('saveUser error — code:', error.code, '| message:', error.message, '| details:', error.details, '| hint:', error.hint, '| full:', JSON.stringify(error));
+  let { error } = await getDB().from('users').upsert(row, { onConflict: 'id' });
+  if(error) {
+    console.error('saveUser error — code:', error.code, '| message:', error.message, '| details:', error.details, '| hint:', error.hint, '| full:', JSON.stringify(error));
+    // Fallback: se as colunas novas (lives_date / quiz_progress) ainda não existem no banco,
+    // tenta salvar sem elas para não perder os dados essenciais (XP, vidas, lições concluídas).
+    if(error.code === 'PGRST204' || (error.message && (error.message.includes('lives_date') || error.message.includes('quiz_progress') || error.message.includes('column')))) {
+      const fallbackRow = { ...row };
+      delete fallbackRow.lives_date;
+      delete fallbackRow.quiz_progress;
+      const retry = await getDB().from('users').upsert(fallbackRow, { onConflict: 'id' });
+      if(retry.error) console.error('saveUser fallback error:', retry.error.message);
+      else console.warn('saveUser: salvo sem lives_date/quiz_progress — adicione essas colunas na tabela users no Supabase.');
+    }
+  }
 }
 function saveUsers() {
   // Legacy: save all users to Supabase
@@ -3806,7 +3828,7 @@ async function handleLogin() {
   user.totalAccesses = (user.totalAccesses || 0) + 1;
   user.sessionStart = Date.now();
 
-  // Streak + lives renewal logic (only on new day)
+  // Streak renewal logic (only on new day)
   const lastDate = user.lastActive;
   const todayDate = today();
   if(lastDate !== todayDate) {
@@ -3814,8 +3836,18 @@ async function handleLogin() {
     if(diff > 1) user.streak = 1;
     else user.streak++;
     user.lastActive = todayDate;
-    user.lives = 5; // full renewal only on a new day
   }
+
+  // Lives renewal: só restaura no PRIMEIRO acesso de um dia novo, baseado em livesDate
+  // (livesDate é a data em que as vidas foram usadas/zeradas pela última vez — não a do último login)
+  if(!user.livesDate) {
+    // primeira vez que esse usuário usa o sistema com essa lógica — inicializa sem alterar vidas atuais
+    user.livesDate = todayDate;
+  } else if(user.livesDate !== todayDate) {
+    user.lives = 5; // novo dia → restaura vidas, só uma vez
+    user.livesDate = todayDate;
+  }
+  // Se livesDate === todayDate, NÃO restaura vidas, mesmo com logout/login, refresh ou troca de navegador.
 
   await saveUser(user);
   state.currentUser = user;
@@ -3869,14 +3901,8 @@ async function handleLogin() {
     document.getElementById('nav-monitoring').classList.remove('hidden');
   }
 
-  if(user.position === 'Líder' && !user.isAdmin) {
-    setTimeout(function() {
-      updateLeaderNavStats();
-      renderLeaderHome();
-      showScreen('screen-leader');
-    }, 5000);
-    return;
-  }
+  // HSE agora é o primeiro módulo da trilha normal para TODOS os cargos (inclusive Líder).
+  // O fluxo especial de tela de Líder foi descontinuado em favor da progressão sequencial unificada.
 
   setTimeout(function() {
     showScreen('screen-main');
@@ -3966,8 +3992,20 @@ function showLockedMsg() {
 
 function openModule(modId) {
   const mod = state.modules.find(m => m.id===modId);
-  state.currentModule = mod;
+  if(!mod) return;
   const u = state.currentUser;
+
+  // Trava de segurança: impede abrir módulo fora de sequência mesmo via chamada direta (console/URL)
+  if(!u.isAdmin) {
+    const mi = state.modules.indexOf(mod);
+    if(mi > 0) {
+      const prevMod = state.modules[mi-1];
+      const prevDone = prevMod.lessons.every(l => (u.completedLessons||[]).includes(l.id));
+      if(!prevDone) { showLockedMsg(); return; }
+    }
+  }
+
+  state.currentModule = mod;
 
   let html = `
     <button class="back-btn" onclick="backToHome()">← Voltar</button>
@@ -4029,14 +4067,24 @@ function saveQuizProgress() {
   const q = state.quiz;
   if(!q || !state.currentLesson) return;
   const key = _quizProgressKey(state.currentLesson.id);
-  localStorage.setItem(key, JSON.stringify({
+  const progress = {
+    lessonId: state.currentLesson.id,
     current: q.current,
     lives: q.lives,
     errors: q.errors,
     correct: q.correct,
     answered: q.answered,
     selectedAnswer: q.selectedAnswer
-  }));
+  };
+  localStorage.setItem(key, JSON.stringify(progress));
+
+  // Persiste no Supabase a cada resposta, garantindo continuidade entre dispositivos
+  const u = state.currentUser;
+  if(u && !u.isAdmin) {
+    u.quizProgress = progress;
+    u.lives = q.lives;
+    saveUser(u).catch(e => console.warn('saveQuizProgress remoto falhou:', e));
+  }
 }
 function clearQuizProgress(lessonId) {
   localStorage.removeItem(_quizProgressKey(lessonId));
@@ -4046,18 +4094,36 @@ function startLesson(modId, lessonId) {
   if(!hasLives()) { showNoLivesModal(); return; }
   const mod = state.modules.find(m => m.id===modId);
   const lesson = mod.lessons.find(l => l.id===lessonId);
+  const u = state.currentUser;
+
+  // Trava de segurança: módulo deve estar desbloqueado e lição deve seguir a ordem
+  if(!u.isAdmin) {
+    const mi = state.modules.indexOf(mod);
+    if(mi > 0) {
+      const prevMod = state.modules[mi-1];
+      if(!prevMod.lessons.every(l => (u.completedLessons||[]).includes(l.id))) { showLockedMsg(); return; }
+    }
+    const li = mod.lessons.indexOf(lesson);
+    if(li > 0 && !(u.completedLessons||[]).includes(mod.lessons[li-1].id)) { showLockedMsg(); return; }
+  }
+
   state.currentModule = mod;
   state.currentLesson = lesson;
 
-  // Try to resume saved progress
-  const savedRaw = localStorage.getItem(_quizProgressKey(lessonId));
+  // Prioriza progresso remoto (Supabase) — funciona entre dispositivos.
+  // Fallback para localStorage como cache local rápido.
   let savedProgress = null;
-  try { savedProgress = savedRaw ? JSON.parse(savedRaw) : null; } catch(e) {}
+  if(u.quizProgress && u.quizProgress.lessonId === lessonId) {
+    savedProgress = u.quizProgress;
+  } else {
+    const savedRaw = localStorage.getItem(_quizProgressKey(lessonId));
+    try { savedProgress = savedRaw ? JSON.parse(savedRaw) : null; } catch(e) {}
+  }
 
   state.quiz = {
     questions: [...lesson.questions],
     current: savedProgress ? savedProgress.current : 0,
-    lives: savedProgress ? savedProgress.lives : state.currentUser.lives,
+    lives: u.lives, // vidas sempre vêm do usuário (já renovadas/zeradas corretamente no login)
     errors: savedProgress ? savedProgress.errors : 0,
     correct: savedProgress ? savedProgress.correct : 0,
     startTime: Date.now(),
@@ -4279,6 +4345,9 @@ function checkAnswer() {
     trackQuestionError(question, state.currentLesson, state.currentModule);
     showFeedback(false, question.explanation);
   }
+  // Persiste imediatamente após cada resposta (certa ou errada) — garante continuidade
+  // entre dispositivos mesmo se o usuário fechar a aba antes de avançar.
+  saveQuizProgress();
 }
 
 // ── Question error tracking (stored in localStorage) ──────────
@@ -4406,8 +4475,12 @@ async function finishQuiz() {
     }
   }
 
-  await saveUser(u); // await to guarantee Supabase write before showing result
-  clearQuizProgress(lesson.id); // always clear saved progress on quiz end (restart fresh next time)
+  // finishQuiz só é chamado ao chegar na última pergunta (todas foram exibidas).
+  // Não há "questão pendente" — se não atingiu 100%, a próxima tentativa reinicia a lição.
+  // O que NUNCA é perdido: XP já ganho, vidas restantes, histórico de erros (trackQuestionError).
+  u.quizProgress = null;
+  await saveUser(u);
+  clearQuizProgress(lesson.id);
   updateNavStats();
 
   // Show result
@@ -4429,9 +4502,25 @@ async function finishQuiz() {
 
 async function quizFailed() {
   const u = state.currentUser;
+  const q = state.quiz;
+  const lesson = state.currentLesson;
   u.lives = 0;
+  u.livesDate = today(); // marca que as vidas foram esgotadas HOJE — impede restauração no mesmo dia
+
+  // Persiste o progresso (índice da questão pendente já avança sequencialmente em q.current)
+  if(lesson && q) {
+    u.quizProgress = {
+      lessonId: lesson.id,
+      current: q.current,
+      lives: 0,
+      errors: q.errors,
+      correct: q.correct
+    };
+  }
+
+  // saveQuizProgress já persiste no Supabase E no localStorage (inclui u.lives/u.quizProgress)
+  // NÃO limpa o progresso — será retomado no dia seguinte exatamente de onde parou
   await saveUser(u);
-  if(state.currentLesson) clearQuizProgress(state.currentLesson.id);
   updateNavStats();
 
   document.getElementById('result-trophy').textContent = '💔';
@@ -6270,19 +6359,20 @@ function loadAPIKeyStatus() {
 }
 
 // ============================================================
-// USERS PANEL
+// USERS PANEL — Relatório simplificado
 // ============================================================
 async function renderUsersPanel() {
   const pageEl = document.getElementById('page-users');
   if(!pageEl) return;
 
-  // Read filters BEFORE clearing innerHTML
+  // Lê os filtros e a busca ANTES de limpar a tela (preserva o que o usuário já digitou/selecionou)
   const filterDateFrom = document.getElementById('users-filter-date-from') ? document.getElementById('users-filter-date-from').value : '';
   const filterDateTo   = document.getElementById('users-filter-date-to')   ? document.getElementById('users-filter-date-to').value   : '';
   const filterShift    = document.getElementById('users-filter-shift')     ? document.getElementById('users-filter-shift').value     : '';
   const filterUnit     = document.getElementById('users-filter-unit')      ? document.getElementById('users-filter-unit').value      : '';
   const filterPosition = document.getElementById('users-filter-position')  ? document.getElementById('users-filter-position').value  : '';
-  const searchQuery    = document.getElementById('users-search-input')     ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
+  // searchQuery vem de um campo escondido que só é atualizado quando o usuário pressiona ENTER (ver wireUsersSearchInput)
+  const searchQuery    = state._usersSearchQuery || '';
 
   pageEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);font-weight:700;">🔄 Carregando usuários...</div>';
 
@@ -6290,32 +6380,9 @@ async function renderUsersPanel() {
   (usersData || []).forEach(row => { state.users[row.id] = rowToUser(row); });
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
 
-  const todayStr   = today();
   const units  = [...new Set(allUsers.map(u => u.unit))].sort();
   const shifts = ['T1','T2','T3','ADM'];
 
-  // Build period label for header
-  let periodLabel = '';
-  if(filterDateFrom && filterDateTo)    periodLabel = filterDateFrom + ' a ' + filterDateTo;
-  else if(filterDateFrom)               periodLabel = 'a partir de ' + filterDateFrom;
-  else if(filterDateTo)                 periodLabel = 'até ' + filterDateTo;
-  else                                  periodLabel = todayStr;
-
-  // Apply filters to "access" list (period-sensitive)
-  let accessFiltered = allUsers;
-  if(filterDateFrom) accessFiltered = accessFiltered.filter(u => u.lastActive >= filterDateFrom);
-  if(filterDateTo)   accessFiltered = accessFiltered.filter(u => u.lastActive <= filterDateTo);
-  if(!filterDateFrom && !filterDateTo)  accessFiltered = allUsers.filter(u => u.lastActive === todayStr);
-  if(filterShift)    accessFiltered = accessFiltered.filter(u => u.shift    === filterShift);
-  if(filterUnit)     accessFiltered = accessFiltered.filter(u => u.unit     === filterUnit);
-  if(filterPosition) accessFiltered = accessFiltered.filter(u => u.position === filterPosition);
-  if(searchQuery)    accessFiltered = accessFiltered.filter(u =>
-    u.name.toLowerCase().includes(searchQuery) ||
-    u.id.toLowerCase().includes(searchQuery) ||
-    (u.nickname||'').toLowerCase().includes(searchQuery)
-  );
-
-  // Apply same filters to full user list
   let filtered = allUsers;
   if(filterDateFrom) filtered = filtered.filter(u => u.lastActive >= filterDateFrom);
   if(filterDateTo)   filtered = filtered.filter(u => u.lastActive <= filterDateTo);
@@ -6329,52 +6396,48 @@ async function renderUsersPanel() {
   );
 
   const hasActiveFilter = filterDateFrom || filterDateTo || filterShift || filterUnit || filterPosition || searchQuery;
-  const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
 
-  const userRow = (u) => {
-    const done = (u.completedLessons||[]).length;
-    const totalMods = state.modules.length + (typeof HSE_MODULE !== 'undefined' ? 1 : 0);
-    const doneMods = u.completedModules || 0;
-    const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
-    const isActiveToday = u.lastActive === todayStr;
-    const safeName = u.name.replace(/'/g,"&#39;");
-    return `<div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1.5px solid var(--border);display:flex;align-items:center;gap:10px;">
-      <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--shopee),var(--shopee-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}${u.nickname?' <span style="font-size:10px;color:var(--shopee);font-weight:700;">("'+u.nickname+'")</span>':''}</div>
-        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-top:1px;">${u.id} · ${u.unit} · ${u.shift}${u.position?' · <span style="color:var(--shopee)">'+u.position+'</span>':''}</div>
-        <div style="font-size:10px;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;">
-          <span style="color:var(--gold);font-weight:700;">⭐${u.xp||0}</span>
-          <span style="color:var(--shopee);font-weight:700;">🔥${u.streak||0}</span>
-          <span style="color:var(--blue);font-weight:700;">📚${done}/${totalLessons}</span>
-          <span style="color:var(--purple);font-weight:700;">📦${doneMods}/${totalMods} mód.</span>
-          <span style="color:var(--green);font-weight:700;">❓${u.questionsAnswered||0} Q</span>
-          <span style="color:${isActiveToday?'var(--green)':'var(--text2)'};font-weight:700;">${isActiveToday?'🟢 Hoje':'⚪ '+u.lastActive}</span>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <div style="font-size:12px;font-weight:900;color:${pct>=60?'var(--green)':pct>=30?'var(--blue)':'var(--text2)'};">${pct}%</div>
-        <button onclick="deleteUserFromPanel('${u.id}','${safeName}')" style="background:#FFF0EE;border:1.5px solid #FFCCC4;color:var(--shopee-dark);border-radius:8px;padding:4px 8px;font-size:10px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;white-space:nowrap;">🗑️ Excluir</button>
-      </div>
-    </div>`;
+  // % de conclusão do módulo HSE (sempre o primeiro módulo da trilha, mod_hse_lider)
+  const hseMod = state.modules.find(m => m.id === 'mod_hse_lider') || state.modules[0];
+  const hsePct = (u) => {
+    if(!hseMod || !hseMod.lessons || hseMod.lessons.length === 0) return 0;
+    const done = hseMod.lessons.filter(l => (u.completedLessons||[]).includes(l.id)).length;
+    return Math.round(done / hseMod.lessons.length * 100);
   };
 
-  pageEl.innerHTML = `
-    <h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">👥 Gestão de Usuários</h2>
-    <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px;">Todos os colaboradores cadastrados — CPF visível</p>
+  const tableRows = filtered
+    .sort((a,b) => a.name.localeCompare(b.name))
+    .map(u => {
+      const pct = hsePct(u);
+      const pctColorVal = pct === 100 ? 'var(--green)' : pct > 0 ? 'var(--blue)' : 'var(--text2)';
+      const safeName = u.name.replace(/</g,'&lt;');
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px 8px;font-size:13px;font-weight:700;">${safeName}</td>
+        <td style="padding:10px 8px;font-size:12px;color:var(--text2);">${u.unit||''}</td>
+        <td style="padding:10px 8px;font-size:12px;color:var(--text2);">${u.shift||''}</td>
+        <td style="padding:10px 8px;font-size:12px;color:var(--text2);">${u.position||''}</td>
+        <td style="padding:10px 8px;font-size:13px;font-weight:800;color:var(--gold);">⭐ ${u.xp||0}</td>
+        <td style="padding:10px 8px;font-size:12px;color:var(--text2);">${u.lastActive||''}</td>
+        <td style="padding:10px 8px;font-size:13px;font-weight:800;color:${pctColorVal};">${pct}%</td>
+      </tr>`;
+    }).join('');
 
-    <!-- SEARCH -->
+  pageEl.innerHTML = `
+    <h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">👥 Relatório de Usuários</h2>
+    <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px;">Nome, unidade, turno, cargo, XP, último acesso e % de conclusão do módulo HSE</p>
+
+    <!-- SEARCH (dispara apenas no ENTER) -->
     <div style="background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;border:2px solid var(--border);box-shadow:var(--shadow);">
-      <div style="font-weight:900;font-size:13px;margin-bottom:10px;color:var(--shopee);">🔍 Pesquisar Colaborador</div>
+      <div style="font-weight:900;font-size:13px;margin-bottom:10px;color:var(--shopee);">🔍 Pesquisar Colaborador <span style="font-weight:600;color:var(--text2);font-size:11px;">(pressione ENTER para buscar)</span></div>
       <div style="display:flex;gap:8px;">
-        <input type="text" id="users-search-input" placeholder="Nome, CPF ou apelido..." value="${searchQuery}"
-          oninput="renderUsersPanel()"
+        <input type="text" id="users-search-input" placeholder="Nome, CPF ou apelido... (ENTER para buscar)" value="${searchQuery}"
           style="flex:1;padding:10px 14px;border:2px solid var(--border);border-radius:10px;font-family:Nunito,sans-serif;font-size:14px;font-weight:600;outline:none;" />
-        ${searchQuery ? `<button onclick="document.getElementById('users-search-input').value='';renderUsersPanel()" style="padding:10px 14px;background:var(--bg);border:2px solid var(--border);border-radius:10px;font-family:Nunito,sans-serif;font-size:13px;font-weight:800;cursor:pointer;color:var(--text2);">✕</button>` : ''}
+        <button id="users-search-btn" onclick="triggerUsersSearch()" style="padding:10px 16px;background:var(--shopee);color:#fff;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;">Buscar</button>
+        ${searchQuery ? `<button onclick="clearUsersSearch()" style="padding:10px 14px;background:var(--bg);border:2px solid var(--border);border-radius:10px;font-family:Nunito,sans-serif;font-size:13px;font-weight:800;cursor:pointer;color:var(--text2);">✕</button>` : ''}
       </div>
     </div>
 
-    <!-- FILTERS -->
+    <!-- FILTERS (selects continuam aplicando na hora, pois não são campos de digitação livre) -->
     <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;border:2px solid var(--border);box-shadow:var(--shadow);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div style="font-weight:900;font-size:13px;color:var(--shopee);">🔽 Filtros</div>
@@ -6418,47 +6481,65 @@ async function renderUsersPanel() {
       </div>
     </div>
 
-    <!-- ACCESS HIGHLIGHT + EXCEL EXPORT -->
-    <div style="background:linear-gradient(135deg,#27AE60,#2ECC71);border-radius:16px;padding:16px;margin-bottom:14px;color:#fff;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <div>
-          <div style="font-weight:900;font-size:15px;">🟢 Acessos — ${periodLabel}</div>
-          <div style="font-size:28px;font-weight:900;margin-top:2px;">${accessFiltered.length} <span style="font-size:14px;opacity:0.85;">colaborador(es)</span></div>
-        </div>
-        <button onclick="exportTodayToExcel()" style="background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.6);color:#fff;border-radius:10px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
-          📥 Exportar Excel
-        </button>
-      </div>
-      <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-top:8px;">
-        ${accessFiltered.length === 0
-          ? '<div style="font-size:13px;opacity:0.85;text-align:center;padding:10px;">Nenhum acesso encontrado para este período.</div>'
-          : accessFiltered.sort((a,b) => b.lastActive.localeCompare(a.lastActive)).map(u => `<div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
-              <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0;">${u.name.charAt(0)}</div>
-              <div style="flex:1;">
-                <div style="font-size:12px;font-weight:800;">${u.name}</div>
-                <div style="font-size:10px;opacity:0.85;">${u.id} · ${u.unit} · ${u.shift}${u.position?' · '+u.position:''} · ${u.lastActive}</div>
-              </div>
-              <div style="font-size:11px;font-weight:700;opacity:0.9;">⭐${u.xp||0}</div>
-            </div>`).join('')
-        }
-      </div>
-    </div>
-
-    <!-- ALL USERS LIST -->
-    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:80px;border:2px solid var(--border);box-shadow:var(--shadow);">
+    <!-- TABLE -->
+    <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:80px;border:2px solid var(--border);box-shadow:var(--shadow);overflow-x:auto;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div style="font-weight:900;font-size:14px;color:var(--text);">
-          👤 Todos os Usuários
+          📋 Usuários
           <span style="background:var(--shopee);color:#fff;font-size:11px;padding:2px 8px;border-radius:100px;margin-left:6px;">${filtered.length}</span>
           ${hasActiveFilter ? '<span style="font-size:11px;color:var(--text2);font-weight:600;margin-left:6px;">(filtrado)</span>' : ''}
         </div>
+        <button onclick="exportTodayToExcel()" style="background:var(--shopee);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;">📥 Exportar Excel</button>
       </div>
       ${filtered.length === 0
         ? '<p style="color:var(--text2);font-size:13px;text-align:center;padding:20px;">Nenhum usuário encontrado com os filtros ativos.</p>'
-        : filtered.sort((a,b) => a.name.localeCompare(b.name)).map(userRow).join('')
+        : `<table style="width:100%;border-collapse:collapse;min-width:600px;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border);">
+                <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">Nome</th>
+                <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">Unidade</th>
+                <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">Turno</th>
+                <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">Cargo</th>
+                <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">XP</th>
+                <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">Último Acesso</th>
+                <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">% HSE</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>`
       }
     </div>
   `;
+
+  wireUsersSearchInput();
+}
+
+// Liga o listener de ENTER no campo de busca — a busca NUNCA dispara durante digitação,
+// ao perder foco (blur) ou ao clicar fora. Só dispara com a tecla Enter ou clique no botão Buscar.
+function wireUsersSearchInput() {
+  const input = document.getElementById('users-search-input');
+  if(!input) return;
+  input.addEventListener('keydown', function(e) {
+    if(e.key === 'Enter') {
+      e.preventDefault();
+      triggerUsersSearch();
+    }
+  });
+}
+
+async function triggerUsersSearch() {
+  const input = document.getElementById('users-search-input');
+  const btn = document.getElementById('users-search-btn');
+  if(!input) return;
+  const value = input.value.trim().toLowerCase();
+  state._usersSearchQuery = value;
+  if(btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  await renderUsersPanel();
+}
+
+function clearUsersSearch() {
+  state._usersSearchQuery = '';
+  renderUsersPanel();
 }
 
 function clearUsersFilters() {
@@ -6467,8 +6548,7 @@ function clearUsersFilters() {
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
-  const sq = document.getElementById('users-search-input');
-  if(sq) sq.value = '';
+  state._usersSearchQuery = '';
   renderUsersPanel();
 }
 
@@ -6482,21 +6562,18 @@ async function deleteUserFromPanel(uid, name) {
 }
 
 function exportTodayToExcel() {
-  const todayStr = today();
   const allUsers = Object.values(state.users).filter(u => !u.isAdmin);
-  const totalLessons = state.modules.reduce((a,m) => a + m.lessons.length, 0);
 
   const filterDateFrom = document.getElementById('users-filter-date-from') ? document.getElementById('users-filter-date-from').value : '';
   const filterDateTo   = document.getElementById('users-filter-date-to')   ? document.getElementById('users-filter-date-to').value   : '';
   const filterShift    = document.getElementById('users-filter-shift')     ? document.getElementById('users-filter-shift').value     : '';
   const filterUnit     = document.getElementById('users-filter-unit')      ? document.getElementById('users-filter-unit').value      : '';
   const filterPosition = document.getElementById('users-filter-position')  ? document.getElementById('users-filter-position').value  : '';
-  const searchQuery    = document.getElementById('users-search-input')     ? document.getElementById('users-search-input').value.trim().toLowerCase() : '';
+  const searchQuery    = state._usersSearchQuery || '';
 
   let exportUsers = allUsers;
   if(filterDateFrom) exportUsers = exportUsers.filter(u => u.lastActive >= filterDateFrom);
   if(filterDateTo)   exportUsers = exportUsers.filter(u => u.lastActive <= filterDateTo);
-  if(!filterDateFrom && !filterDateTo) exportUsers = exportUsers.filter(u => u.lastActive === todayStr);
   if(filterShift)    exportUsers = exportUsers.filter(u => u.shift    === filterShift);
   if(filterUnit)     exportUsers = exportUsers.filter(u => u.unit     === filterUnit);
   if(filterPosition) exportUsers = exportUsers.filter(u => u.position === filterPosition);
@@ -6515,15 +6592,17 @@ function exportTodayToExcel() {
   if(filterDateFrom && filterDateTo) periodLabel = filterDateFrom + '_a_' + filterDateTo;
   else if(filterDateFrom) periodLabel = 'a-partir-de_' + filterDateFrom;
   else if(filterDateTo)   periodLabel = 'ate_' + filterDateTo;
-  else                    periodLabel = todayStr;
+  else                    periodLabel = today();
 
-  const headers = ['Nome','Unidade','Turno','Cargo','XP','Total de Questões Respondidas','Total de Módulos Concluídos','Total de Lições Concluídas','Total Lições','Progresso (%)','Último Acesso'];
-  const totalMods = state.modules.length + (typeof HSE_MODULE !== 'undefined' ? 1 : 0);
-  const rows = exportUsers.map(u => {
-    const done = (u.completedLessons||[]).length;
-    const pct  = totalLessons ? Math.round(done/totalLessons*100) : 0;
-    return [u.name, u.unit, u.shift, u.position||'', u.xp||0, u.questionsAnswered||0, u.completedModules||0, done, totalLessons, pct+'%', u.lastActive];
-  });
+  const hseMod = state.modules.find(m => m.id === 'mod_hse_lider') || state.modules[0];
+  const hsePct = (u) => {
+    if(!hseMod || !hseMod.lessons || hseMod.lessons.length === 0) return 0;
+    const done = hseMod.lessons.filter(l => (u.completedLessons||[]).includes(l.id)).length;
+    return Math.round(done / hseMod.lessons.length * 100);
+  };
+
+  const headers = ['Nome','Unidade','Turno','Cargo','XP','Último Acesso','% Conclusão HSE'];
+  const rows = exportUsers.map(u => [u.name, u.unit, u.shift, u.position||'', u.xp||0, u.lastActive, hsePct(u)+'%']);
 
   const BOM = '﻿';
   const csvContent = BOM + [headers, ...rows]
@@ -6534,7 +6613,7 @@ function exportTodayToExcel() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = 'exportacao_' + periodLabel + '.csv';
+  a.download = 'relatorio_usuarios_' + periodLabel + '.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
