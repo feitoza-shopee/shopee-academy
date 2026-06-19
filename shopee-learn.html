@@ -3563,6 +3563,50 @@ async function loadModulesFromSupabase() {
   } catch(e) {}
   return null;
 }
+
+// ── HSE Module persistence ──────────────────────────────────────
+function saveHSEModule() {
+  try { localStorage.setItem('sa_hse_module', JSON.stringify(HSE_MODULE)); } catch(e) {}
+  getDB().from('app_config')
+    .upsert({ key: 'hse_module', value: JSON.stringify(HSE_MODULE) }, { onConflict: 'key' })
+    .then(({ error }) => { if(error) console.error('saveHSEModule Supabase error:', error.message); });
+}
+
+async function loadHSEModuleFromSupabase() {
+  // 1) Try Supabase first
+  try {
+    const _timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000));
+    const _fetch = getDB().from('app_config').select('value').eq('key', 'hse_module').single();
+    const { data, error } = await Promise.race([_fetch, _timeout]);
+    if(!error && data && data.value) {
+      const parsed = JSON.parse(data.value);
+      if(parsed && Array.isArray(parsed.lessons)) {
+        // Merge lessons in-place so object reference stays the same for all code
+        parsed.lessons.forEach((savedLesson, idx) => {
+          if(HSE_MODULE.lessons[idx]) {
+            HSE_MODULE.lessons[idx].questions = savedLesson.questions || HSE_MODULE.lessons[idx].questions;
+          }
+        });
+        localStorage.setItem('sa_hse_module', data.value);
+        return;
+      }
+    }
+  } catch(e) {}
+  // 2) Fallback to localStorage
+  try {
+    const raw = localStorage.getItem('sa_hse_module');
+    if(raw) {
+      const parsed = JSON.parse(raw);
+      if(parsed && Array.isArray(parsed.lessons)) {
+        parsed.lessons.forEach((savedLesson, idx) => {
+          if(HSE_MODULE.lessons[idx]) {
+            HSE_MODULE.lessons[idx].questions = savedLesson.questions || HSE_MODULE.lessons[idx].questions;
+          }
+        });
+      }
+    }
+  } catch(e) {}
+}
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -3876,6 +3920,9 @@ async function handleLogin() {
     }
   }
   if (!Array.isArray(state.modules)) state.modules = [];
+
+  // Carrega o módulo HSE do Supabase/localStorage para garantir que edições do admin sejam vistas
+  await loadHSEModuleFromSupabase();
 
   // Recalculate derived counters (not stored in DB) from completedLessons + modules
   const _allLessons = state.modules.flatMap(m => m.lessons || []);
@@ -7461,6 +7508,7 @@ function adminDeleteHSEQuestion(lessonIdx, qi) {
   if(!lesson) return;
   if(!confirm('Excluir esta pergunta do módulo HSE?')) return;
   lesson.questions.splice(qi, 1);
+  saveHSEModule();
   const listEl = document.getElementById('hse-q-list-' + lessonIdx);
   if(listEl) listEl.innerHTML = renderHSEQuestionList(lessonIdx);
   const countEl = document.getElementById('hse-header-count-' + lessonIdx);
@@ -7555,6 +7603,7 @@ function adminSaveHSEQuestionEdit(lessonIdx, qi) {
   document.getElementById('q-edit-overlay').remove();
   const listEl = document.getElementById('hse-q-list-' + lessonIdx);
   if(listEl) listEl.innerHTML = renderHSEQuestionList(lessonIdx);
+  saveHSEModule();
   showToast('✅ Pergunta HSE atualizada!');
 }
 
@@ -7563,6 +7612,7 @@ function adminClearAllQuestions_HSE(lessonIdx) {
   if(!lesson) return;
   if(!confirm('Limpar TODAS as ' + lesson.questions.length + ' perguntas desta lição HSE? Esta ação não pode ser desfeita.')) return;
   lesson.questions = [];
+  saveHSEModule();
   const listEl = document.getElementById('hse-q-list-' + lessonIdx);
   if(listEl) listEl.innerHTML = renderHSEQuestionList(lessonIdx);
   const countEl = document.getElementById('hse-header-count-' + lessonIdx);
@@ -7597,6 +7647,8 @@ window.adminSaveHSEQuestionEdit = adminSaveHSEQuestionEdit;
 window.adminClearAllQuestions_HSE = adminClearAllQuestions_HSE;
 window.adminClearAllQuestions   = adminClearAllQuestions;
 window.renderHSEQuestionList    = renderHSEQuestionList;
+window.saveHSEModule            = saveHSEModule;
+window.loadHSEModuleFromSupabase = loadHSEModuleFromSupabase;
 window.showNoLivesModal      = showNoLivesModal;
 window.showLessonDoneMsg     = showLessonDoneMsg;
 window.closeNoLivesModal     = closeNoLivesModal;
@@ -7717,6 +7769,8 @@ async function adminSaveModules() {
   // Salva no localStorage imediatamente
   if (!Array.isArray(state.modules)) state.modules = [];
   localStorage.setItem('sa_modules', JSON.stringify(state.modules));
+  // Salva o módulo HSE junto para garantir que edições HSE também persistam
+  saveHSEModule();
 
   // Tenta salvar no Supabase com timeout de 5s
   let supabaseOk = false;
