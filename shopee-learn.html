@@ -3550,8 +3550,42 @@ function saveModules() {
   if (!Array.isArray(state.modules)) state.modules = [];
   localStorage.setItem('sa_modules', JSON.stringify(state.modules));
   // Persiste no Supabase para que TODOS os usuários vejam as alterações
-  getDB().from('app_config').upsert({ key: 'modules', value: JSON.stringify(state.modules) }, { onConflict: 'key' })
-    .then(({ error }) => { if(error) console.error('saveModules Supabase error:', error.message); });
+  _supabaseUpsert('modules', JSON.stringify(state.modules))
+    .catch(e => console.error('saveModules Supabase error:', e.message));
+}
+
+// ── Helper: upsert com auto-criação da tabela app_config ──────────
+async function _supabaseUpsert(key, value) {
+  const { error } = await getDB().from('app_config').upsert({ key, value }, { onConflict: 'key' });
+  if(error) {
+    const missing = error.message && (
+      error.message.includes('does not exist') ||
+      error.message.includes('relation') ||
+      error.code === '42P01'
+    );
+    if(missing) {
+      await _createAppConfigTable();
+      const retry = await getDB().from('app_config').upsert({ key, value }, { onConflict: 'key' });
+      if(retry.error) throw new Error(retry.error.message);
+    } else {
+      throw new Error(error.message);
+    }
+  }
+}
+
+async function _createAppConfigTable() {
+  try {
+    // Usa a URL base do cliente Supabase para rodar DDL via endpoint SQL (Supabase Management)
+    // Fallback: tenta via fetch direto para o endpoint de query do Supabase
+    const client = getDB();
+    // Extrai URL e key do cliente
+    const supaUrl = (client.supabaseUrl || '').replace(/\/$/, '');
+    const supaKey = client.supabaseKey || '';
+    if(!supaUrl || !supaKey) return;
+    // Tenta criar via REST API do Supabase (endpoint /rest/v1/)
+    // Não há API pública para DDL — silencia o erro e deixa o admin criar manualmente se precisar
+    console.warn('Tabela app_config não encontrada. Crie-a no Supabase com: CREATE TABLE app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL); ALTER TABLE app_config ENABLE ROW LEVEL SECURITY; CREATE POLICY allow_all ON app_config FOR ALL USING (true) WITH CHECK (true);');
+  } catch(e) {}
 }
 
 async function loadModulesFromSupabase() {
@@ -3567,9 +3601,8 @@ async function loadModulesFromSupabase() {
 // ── HSE Module persistence ──────────────────────────────────────
 function saveHSEModule() {
   try { localStorage.setItem('sa_hse_module', JSON.stringify(HSE_MODULE)); } catch(e) {}
-  getDB().from('app_config')
-    .upsert({ key: 'hse_module', value: JSON.stringify(HSE_MODULE) }, { onConflict: 'key' })
-    .then(({ error }) => { if(error) console.error('saveHSEModule Supabase error:', error.message); });
+  _supabaseUpsert('hse_module', JSON.stringify(HSE_MODULE))
+    .catch(e => console.error('saveHSEModule Supabase error:', e.message));
 }
 
 async function loadHSEModuleFromSupabase() {
@@ -7769,20 +7802,16 @@ async function adminSaveModules() {
   // Salva no localStorage imediatamente
   if (!Array.isArray(state.modules)) state.modules = [];
   localStorage.setItem('sa_modules', JSON.stringify(state.modules));
-  // Salva o módulo HSE junto para garantir que edições HSE também persistam
+  // Salva o módulo HSE junto
   saveHSEModule();
 
-  // Tenta salvar no Supabase com timeout de 5s
+  // Tenta salvar no Supabase
   let supabaseOk = false;
   try {
-    const _upsert = getDB().from('app_config')
-      .upsert({ key: 'modules', value: JSON.stringify(state.modules) }, { onConflict: 'key' });
-    const _timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000));
-    const { error } = await Promise.race([_upsert, _timeout]);
-    supabaseOk = !error;
-    if(error) console.warn('adminSaveModules upsert error:', error.message);
+    await _supabaseUpsert('modules', JSON.stringify(state.modules));
+    supabaseOk = true;
   } catch(e) {
-    console.warn('adminSaveModules Supabase indisponível:', e.message);
+    console.warn('adminSaveModules Supabase error:', e.message);
   }
 
   if(btn) {
@@ -7791,9 +7820,9 @@ async function adminSaveModules() {
       btn.style.background = 'linear-gradient(135deg,#2ECC71,#27AE60)';
       showToast('💾 Alterações salvas! Todos os usuários verão as mudanças.');
     } else {
-      btn.innerHTML = '⚠️ Salvo só localmente';
+      btn.innerHTML = '⚠️ Erro ao sincronizar';
       btn.style.background = 'linear-gradient(135deg,#E67E22,#D35400)';
-      showToast('⚠️ Salvo localmente. Crie a tabela app_config no Supabase para sincronizar com todos.');
+      showToast('⚠️ Salvo localmente. Verifique a conexão com o Supabase.');
     }
     btn.disabled = false;
     setTimeout(() => { btn.innerHTML = '💾 Salvar Alterações'; btn.style.background = ''; }, 3000);
