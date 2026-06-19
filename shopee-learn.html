@@ -6419,6 +6419,7 @@ async function renderUsersPanel() {
         <td style="padding:10px 8px;font-size:13px;font-weight:800;color:var(--gold);">⭐ ${u.xp||0}</td>
         <td style="padding:10px 8px;font-size:12px;color:var(--text2);">${u.lastActive||''}</td>
         <td style="padding:10px 8px;font-size:13px;font-weight:800;color:${pctColorVal};">${pct}%</td>
+        <td style="padding:10px 8px;text-align:center;"><button onclick="deleteUserFromPanel('${u.id}','${u.name.replace(/'/g,"&#39;")}')" style="background:#FF4D4D;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">🗑️ Excluir</button></td>
       </tr>`;
     }).join('');
 
@@ -6503,6 +6504,7 @@ async function renderUsersPanel() {
                 <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">XP</th>
                 <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">Último Acesso</th>
                 <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--text2);">% HSE</th>
+                <th style="padding:8px;text-align:center;font-size:11px;text-transform:uppercase;color:var(--text2);">Ações</th>
               </tr>
             </thead>
             <tbody>${tableRows}</tbody>
@@ -7746,6 +7748,38 @@ async function adminSaveModules() {
   renderHome();
 }
 window.adminSaveModules = adminSaveModules;
+
+// ── Renovação automática de vidas durante a sessão ──────────────────────────
+// Verifica a cada minuto se o dia virou enquanto o usuário está logado.
+// Garante que as vidas sejam renovadas mesmo sem logout/login.
+(function startDailyLivesRenewal() {
+  setInterval(async function checkDailyLivesRenewal() {
+    const u = state.currentUser;
+    if (!u || !u.id) return; // nenhum usuário logado
+
+    const todayDate = today();
+    if (u.livesDate && u.livesDate !== todayDate) {
+      // Novo dia detectado com usuário ainda na sessão → renova as vidas
+      u.lives = 5;
+      u.livesDate = todayDate;
+      await saveUser(u);
+
+      // Atualiza o contador de vidas no topo da tela
+      const navLives = document.getElementById('nav-lives');
+      if (navLives) navLives.textContent = 5;
+
+      // Se o banner de "sem vidas" estiver visível, esconde-o
+      const noLivesBanner = document.getElementById('no-lives-banner');
+      if (noLivesBanner) noLivesBanner.remove();
+
+      // Fecha o modal de sem vidas, se aberto
+      const noLivesModal = document.getElementById('modal-no-lives');
+      if (noLivesModal) noLivesModal.classList.add('hidden');
+
+      showToast('❤️ Suas vidas foram renovadas! Bom estudo!');
+    }
+  }, 60 * 1000); // verifica a cada 1 minuto
+})();
 </script>
 
 </body>
