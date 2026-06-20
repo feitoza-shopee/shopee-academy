@@ -3548,7 +3548,7 @@ function saveUsers() {
   // Legacy: save all users to Supabase
   Object.values(state.users).forEach(u => saveUser(u));
 }
-// Garante a ordem fixa: mod_hse (1º) e mod_hse_lider (2º) em state.modules
+// Garante a ordem fixa: mod_hse (1º), mod_hse_lider (2º) e mod_paleteira (3º) em state.modules
 function ensureHSEFirst() {
   if(!Array.isArray(state.modules)) return;
 
@@ -3564,6 +3564,18 @@ function ensureHSEFirst() {
   if(liderIdx > 1) {
     const lider = state.modules.splice(liderIdx, 1)[0];
     state.modules.splice(1, 0, lider);
+  }
+
+  // Garante que o módulo de Treinamento de Paleteiras exista para todos os usuários
+  if(typeof PALETEIRA_MODULE !== 'undefined' && !state.modules.some(m => m.id === PALETEIRA_MODULE.id)) {
+    state.modules.splice(2, 0, PALETEIRA_MODULE);
+  }
+
+  // Fixa mod_paleteira na posição 2 (3º módulo, logo após HSE e HSE Líderes)
+  const paleteiraIdx = state.modules.findIndex(m => m.id === 'mod_paleteira');
+  if(paleteiraIdx > 2) {
+    const pal = state.modules.splice(paleteiraIdx, 1)[0];
+    state.modules.splice(2, 0, pal);
   }
 }
 
@@ -5315,7 +5327,7 @@ function renderAdminModulesList() {
       <!-- Module header -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">
-          <button onclick="moveModule('${mod.id}',-1)" ${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'disabled':''} style="background:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'default':'pointer'};opacity:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'0.4':'1'};">▲</button>
+          <button onclick="moveModule('${mod.id}',-1)" ${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'disabled':''} style="background:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'default':'pointer'};opacity:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'0.4':'1'};">▲</button>
           <button onclick="moveModule('${mod.id}',1)" ${mi===state.modules.length-1?'disabled':''} style="background:${mi===state.modules.length-1?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${mi===state.modules.length-1?'default':'pointer'};opacity:${mi===state.modules.length-1?'0.4':'1'};">▼</button>
         </div>
         <div style="width:40px;height:40px;border-radius:10px;background:${mod.color};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${mod.icon}</div>
@@ -5361,11 +5373,11 @@ function renderAdminModulesList() {
 function moveModule(modId, direction) {
   const idx = state.modules.findIndex(m => m.id === modId);
   if(idx === -1) return;
-  // mod_hse (1º) e mod_hse_lider (2º) são fixos — não podem ser movidos
-  if(modId === 'mod_hse' || modId === 'mod_hse_lider') return;
+  // mod_hse (1º), mod_hse_lider (2º) e mod_paleteira (3º) são fixos — não podem ser movidos
+  if(modId === 'mod_hse' || modId === 'mod_hse_lider' || modId === 'mod_paleteira') return;
   const newIdx = idx + direction;
-  // Posições 0 e 1 são reservadas ao HSE e HSE Líderes
-  const fixedCount = state.modules.filter(m => m.id === 'mod_hse' || m.id === 'mod_hse_lider').length;
+  // Posições 0, 1 e 2 são reservadas ao HSE, HSE Líderes e Paleteiras
+  const fixedCount = state.modules.filter(m => m.id === 'mod_hse' || m.id === 'mod_hse_lider' || m.id === 'mod_paleteira').length;
   if(newIdx < fixedCount || newIdx >= state.modules.length) return;
 
   // Swap
@@ -7151,9 +7163,68 @@ function hasLives() {
 }
 
 // ============================================================
-// LEADER / HSE INTERFACE
+// TREINAMENTO DE PALETEIRAS (3º módulo da trilha, obrigatório p/ todos)
 // ============================================================
-const HSE_MODULE = {
+const PALETEIRA_MODULE = {
+  id: 'mod_paleteira',
+  title: 'Treinamento de Paleteiras',
+  description: 'Operação segura de paleteiras manuais e elétricas: inspeção, condução, movimentação de cargas e NRs aplicáveis.',
+  icon: '🛒',
+  color: 'linear-gradient(135deg,#2980B9,#1F618D)',
+  lessons: [
+    {
+      id: 'paleteira_l1', title: 'Inspeção e Condução Segura',
+      description: 'Checklist pré-uso, postura de condução e regras básicas de circulação',
+      xpReward: 110,
+      questions: [
+        { type:'multiple', q:'Antes de iniciar o uso de uma paleteira, qual procedimento o operador deve realizar?',
+          options:['Usar direto, sem verificação prévia','Realizar checklist pré-uso, verificando rodas, garfos, sistema hidráulico e freio','Apenas verificar se está carregada (paleteira elétrica)','Aguardar autorização verbal do líder a cada uso'],
+          answer:1, explanation:'O checklist pré-uso (rodas, garfos, sistema hidráulico/elétrico e freio) é obrigatório antes de qualquer operação, para identificar falhas que possam causar acidentes.' },
+        { type:'truefalse', q:'Ao conduzir a paleteira hidráulica manual, o operador deve ficar posicionado à frente do timão, puxando-a, e nunca empurrando de trás sem visibilidade.',
+          answer:true, explanation:'Correto. Conduzir puxando, à frente do timão, garante visibilidade do trajeto e controle da carga, reduzindo o risco de colisões e atropelamentos.' },
+        { type:'multiple', q:'O que deve ser feito ao estacionar a paleteira após o uso?',
+          options:['Deixá-la no meio do corredor para facilitar o próximo uso','Abaixar os garfos totalmente, acionar o freio (se houver) e deixá-la em local sinalizado, fora da rota de circulação','Deixar os garfos erguidos para liberar espaço no piso','Deixar conectada à tomada mesmo sendo paleteira manual'],
+          answer:1, explanation:'Garfos abaixados, freio acionado e local sinalizado evitam tropeços, danos ao equipamento e bloqueio de rotas de emergência.' },
+        { type:'truefalse', q:'É permitido transportar pessoas sobre os garfos ou na plataforma da paleteira.',
+          answer:false, explanation:'Nunca. Paleteiras são equipamentos para movimentação de carga, não de pessoas. Transportar pessoas é uma violação grave de segurança.' },
+        { type:'multiple', q:'Em uma esquina ou cruzamento de corredores, qual conduta é a correta ao operar a paleteira?',
+          options:['Acelerar para passar rápido antes de outro equipamento','Buzinar/avisar, reduzir a velocidade e dar preferência a quem já está cruzando','Ignorar, já que paleteiras manuais não geram risco de colisão','Fechar os olhos momentaneamente na curva'],
+          answer:1, explanation:'Reduzir velocidade e sinalizar em cruzamentos previne colisões com outros equipamentos, cargas e pessoas — mesmo em paleteiras manuais.' }
+      ]
+    },
+    {
+      id: 'paleteira_l2', title: 'Movimentação de Cargas e Limites de Segurança',
+      description: 'Capacidade de carga, estabilidade do palete e normas regulamentadoras (NR-11/NR-12)',
+      xpReward: 120,
+      questions: [
+        { type:'multiple', q:'Qual o principal risco ao exceder a capacidade de carga indicada na placa da paleteira?',
+          options:['Nenhum risco, pois as paleteiras têm margem extra de segurança não informada','Sobrecarga do sistema hidráulico/elétrico, perda de estabilidade e tombamento da carga','Apenas desgaste estético do equipamento','Redução do tempo de recarga da bateria'],
+          answer:1, explanation:'Exceder a capacidade indicada pode causar falha do sistema hidráulico/elétrico, perda de estabilidade e tombamento, com risco grave de acidente.' },
+        { type:'truefalse', q:'Antes de erguer a carga, o operador deve verificar se o palete está bem encaixado e centralizado nos garfos.',
+          answer:true, explanation:'Correto. Um palete mal encaixado ou descentralizado pode desequilibrar a carga durante o deslocamento, aumentando o risco de queda.' },
+        { type:'multiple', q:'De acordo com a NR-11, o que deve ser priorizado na movimentação de materiais com equipamentos como a paleteira?',
+          options:['Velocidade máxima de operação para ganho de produtividade','Segurança na movimentação, armazenagem e manuseio de materiais, com operadores capacitados','Uso do equipamento por qualquer colaborador, capacitado ou não','Movimentação apenas em horários de menor circulação'],
+          answer:1, explanation:'A NR-11 trata da segurança no transporte, movimentação, armazenagem e manuseio de materiais, exigindo capacitação adequada dos operadores.' },
+        { type:'truefalse', q:'Descer rampas com a paleteira carregada de marcha à ré (carga atrás) é uma prática recomendada para manter o controle do equipamento.',
+          answer:true, explanation:'Correto. Em descidas, manter a carga "atrás" (ré) ajuda a controlar o equipamento e evita que a carga ganhe impulso e fuja do controle do operador.' },
+        { type:'order', q:'Ordene corretamente os passos para erguer e transportar uma carga com a paleteira:',
+          steps:[
+            'Posicionar os garfos totalmente sob o palete, alinhados e centralizados',
+            'Acionar a bomba/sistema para erguer a carga a uma altura segura de deslocamento',
+            'Verificar estabilidade da carga e visibilidade do trajeto',
+            'Conduzir a paleteira na velocidade adequada até o destino'
+          ],
+          correctOrder:[0,1,2,3],
+          explanation:'A sequência correta é: posicionar os garfos → erguer a carga a altura segura → verificar estabilidade e visibilidade → conduzir até o destino.' },
+        { type:'multiple', q:'Qual é a conduta correta caso o operador identifique um vazamento de óleo hidráulico ou falha elétrica na paleteira?',
+          options:['Continuar usando até o fim do turno e reportar depois','Interromper o uso imediatamente, sinalizar o equipamento e comunicar ao líder/manutenção','Tentar reparar o equipamento por conta própria','Ignorar se o vazamento for pequeno'],
+          answer:1, explanation:'Qualquer falha identificada (vazamento, problema elétrico, etc.) exige interrupção imediata do uso, sinalização e comunicação para manutenção, conforme a NR-12.' }
+      ]
+    }
+  ]
+};
+
+
   id: 'mod_hse_lider',
   title: 'HSE para Líderes — Saúde, Segurança e Meio Ambiente',
   description: 'Conteúdo avançado de HSE com foco na atuação do Líder: EPIs, prevenção de acidentes, ergonomia e gestão de riscos.',
