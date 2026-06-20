@@ -3548,13 +3548,22 @@ function saveUsers() {
   // Legacy: save all users to Supabase
   Object.values(state.users).forEach(u => saveUser(u));
 }
-// Garante que o módulo HSE (mod_hse) seja sempre o primeiro de state.modules
+// Garante a ordem fixa: mod_hse (1º) e mod_hse_lider (2º) em state.modules
 function ensureHSEFirst() {
   if(!Array.isArray(state.modules)) return;
+
+  // Fixa mod_hse na posição 0
   const hseIdx = state.modules.findIndex(m => m.id === 'mod_hse');
   if(hseIdx > 0) {
     const hse = state.modules.splice(hseIdx, 1)[0];
     state.modules.unshift(hse);
+  }
+
+  // Fixa mod_hse_lider na posição 1 (logo após mod_hse)
+  const liderIdx = state.modules.findIndex(m => m.id === 'mod_hse_lider');
+  if(liderIdx > 1) {
+    const lider = state.modules.splice(liderIdx, 1)[0];
+    state.modules.splice(1, 0, lider);
   }
 }
 
@@ -5362,7 +5371,7 @@ function renderAdminModulesList() {
       <!-- Module header -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">
-          <button onclick="moveModule('${mod.id}',-1)" ${(mod.id==='mod_hse'||mi<=1)?'disabled':''} style="background:${(mod.id==='mod_hse'||mi<=1)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mod.id==='mod_hse'||mi<=1)?'default':'pointer'};opacity:${(mod.id==='mod_hse'||mi<=1)?'0.4':'1'};">▲</button>
+          <button onclick="moveModule('${mod.id}',-1)" ${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'disabled':''} style="background:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'default':'pointer'};opacity:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=2)?'0.4':'1'};">▲</button>
           <button onclick="moveModule('${mod.id}',1)" ${mi===state.modules.length-1?'disabled':''} style="background:${mi===state.modules.length-1?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${mi===state.modules.length-1?'default':'pointer'};opacity:${mi===state.modules.length-1?'0.4':'1'};">▼</button>
         </div>
         <div style="width:40px;height:40px;border-radius:10px;background:${mod.color};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${mod.icon}</div>
@@ -5408,12 +5417,12 @@ function renderAdminModulesList() {
 function moveModule(modId, direction) {
   const idx = state.modules.findIndex(m => m.id === modId);
   if(idx === -1) return;
-  // HSE sempre fica em primeiro — não pode ser movido
-  if(modId === 'mod_hse') return;
+  // mod_hse (1º) e mod_hse_lider (2º) são fixos — não podem ser movidos
+  if(modId === 'mod_hse' || modId === 'mod_hse_lider') return;
   const newIdx = idx + direction;
-  // Posição 0 é reservada ao HSE; outros módulos começam do índice 1
-  const hseInList = state.modules.findIndex(m => m.id === 'mod_hse') !== -1;
-  if(newIdx < (hseInList ? 1 : 0) || newIdx >= state.modules.length) return;
+  // Posições 0 e 1 são reservadas ao HSE e HSE Líderes
+  const fixedCount = state.modules.filter(m => m.id === 'mod_hse' || m.id === 'mod_hse_lider').length;
+  if(newIdx < fixedCount || newIdx >= state.modules.length) return;
 
   // Swap
   const temp = state.modules[idx];
