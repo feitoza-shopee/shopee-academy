@@ -3548,15 +3548,13 @@ function saveUsers() {
   // Legacy: save all users to Supabase
   Object.values(state.users).forEach(u => saveUser(u));
 }
-// Garante que o módulo HSE seja sempre o primeiro de state.modules
+// Garante que o módulo HSE (mod_hse) seja sempre o primeiro de state.modules
 function ensureHSEFirst() {
-  if(!Array.isArray(state.modules) || typeof HSE_MODULE === 'undefined') return;
-  const hseIdx = state.modules.findIndex(m => m.id === HSE_MODULE.id);
+  if(!Array.isArray(state.modules)) return;
+  const hseIdx = state.modules.findIndex(m => m.id === 'mod_hse');
   if(hseIdx > 0) {
     const hse = state.modules.splice(hseIdx, 1)[0];
     state.modules.unshift(hse);
-  } else if(hseIdx === -1) {
-    state.modules.unshift(HSE_MODULE);
   }
 }
 
@@ -4013,6 +4011,7 @@ async function handleLogin() {
 // ============================================================
 function renderHome() {
   if (!Array.isArray(state.modules)) state.modules = [];
+  ensureHSEFirst();
   const u = state.currentUser;
   const totalLessons = state.modules.reduce((a,m) => a+m.lessons.length, 0);
   const completedCount = (u.completedLessons||[]).length;
@@ -5363,7 +5362,7 @@ function renderAdminModulesList() {
       <!-- Module header -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">
-          <button onclick="moveModule('${mod.id}',-1)" ${(mi<=1)?'disabled':''} style="background:${(mi<=1)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mi<=1)?'default':'pointer'};opacity:${(mi<=1)?'0.4':'1'};">▲</button>
+          <button onclick="moveModule('${mod.id}',-1)" ${(mod.id==='mod_hse'||mi<=1)?'disabled':''} style="background:${(mod.id==='mod_hse'||mi<=1)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mod.id==='mod_hse'||mi<=1)?'default':'pointer'};opacity:${(mod.id==='mod_hse'||mi<=1)?'0.4':'1'};">▲</button>
           <button onclick="moveModule('${mod.id}',1)" ${mi===state.modules.length-1?'disabled':''} style="background:${mi===state.modules.length-1?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${mi===state.modules.length-1?'default':'pointer'};opacity:${mi===state.modules.length-1?'0.4':'1'};">▼</button>
         </div>
         <div style="width:40px;height:40px;border-radius:10px;background:${mod.color};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${mod.icon}</div>
@@ -5410,10 +5409,11 @@ function moveModule(modId, direction) {
   const idx = state.modules.findIndex(m => m.id === modId);
   if(idx === -1) return;
   // HSE sempre fica em primeiro — não pode ser movido
-  if(typeof HSE_MODULE !== 'undefined' && modId === HSE_MODULE.id) return;
+  if(modId === 'mod_hse') return;
   const newIdx = idx + direction;
-  // Não deixa outro módulo subir para cima do HSE (posição 0 é reservada)
-  if(newIdx < 1 || newIdx >= state.modules.length) return;
+  // Posição 0 é reservada ao HSE; outros módulos começam do índice 1
+  const hseInList = state.modules.findIndex(m => m.id === 'mod_hse') !== -1;
+  if(newIdx < (hseInList ? 1 : 0) || newIdx >= state.modules.length) return;
 
   // Swap
   const temp = state.modules[idx];
