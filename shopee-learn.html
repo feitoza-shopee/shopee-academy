@@ -3548,7 +3548,7 @@ function saveUsers() {
   // Legacy: save all users to Supabase
   Object.values(state.users).forEach(u => saveUser(u));
 }
-// Garante a ordem fixa: mod_hse (1º), mod_hse_lider (2º) e mod_paleteira (3º) em state.modules
+// Garante a ordem fixa: mod_hse (1º), mod_paleteira (2º) e mod_hse_lider (3º) em state.modules
 function ensureHSEFirst() {
   if(!Array.isArray(state.modules)) return;
 
@@ -3559,23 +3559,23 @@ function ensureHSEFirst() {
     state.modules.unshift(hse);
   }
 
-  // Fixa mod_hse_lider na posição 1 (logo após mod_hse)
-  const liderIdx = state.modules.findIndex(m => m.id === 'mod_hse_lider');
-  if(liderIdx > 1) {
-    const lider = state.modules.splice(liderIdx, 1)[0];
-    state.modules.splice(1, 0, lider);
-  }
-
   // Garante que o módulo de Treinamento de Paleteiras exista para todos os usuários
   if(typeof PALETEIRA_MODULE !== 'undefined' && !state.modules.some(m => m.id === PALETEIRA_MODULE.id)) {
-    state.modules.splice(2, 0, PALETEIRA_MODULE);
+    state.modules.splice(1, 0, PALETEIRA_MODULE);
   }
 
-  // Fixa mod_paleteira na posição 2 (3º módulo, logo após HSE e HSE Líderes)
+  // Fixa mod_paleteira na posição 1 (2º módulo, logo após HSE)
   const paleteiraIdx = state.modules.findIndex(m => m.id === 'mod_paleteira');
-  if(paleteiraIdx > 2) {
+  if(paleteiraIdx > 1) {
     const pal = state.modules.splice(paleteiraIdx, 1)[0];
-    state.modules.splice(2, 0, pal);
+    state.modules.splice(1, 0, pal);
+  }
+
+  // Fixa mod_hse_lider na posição 2 (3º módulo, logo após HSE e Paleteiras)
+  const liderIdx = state.modules.findIndex(m => m.id === 'mod_hse_lider');
+  if(liderIdx > 2) {
+    const lider = state.modules.splice(liderIdx, 1)[0];
+    state.modules.splice(2, 0, lider);
   }
 }
 
@@ -5373,7 +5373,7 @@ function renderAdminModulesList() {
 function moveModule(modId, direction) {
   const idx = state.modules.findIndex(m => m.id === modId);
   if(idx === -1) return;
-  // mod_hse (1º), mod_hse_lider (2º) e mod_paleteira (3º) são fixos — não podem ser movidos
+  // mod_hse (1º), mod_paleteira (2º) e mod_hse_lider (3º) são fixos — não podem ser movidos
   if(modId === 'mod_hse' || modId === 'mod_hse_lider' || modId === 'mod_paleteira') return;
   const newIdx = idx + direction;
   // Posições 0, 1 e 2 são reservadas ao HSE, HSE Líderes e Paleteiras
@@ -7163,7 +7163,7 @@ function hasLives() {
 }
 
 // ============================================================
-// TREINAMENTO DE PALETEIRAS (3º módulo da trilha, obrigatório p/ todos)
+// TREINAMENTO DE PALETEIRAS (2º módulo da trilha, obrigatório p/ todos)
 // ============================================================
 const PALETEIRA_MODULE = {
   id: 'mod_paleteira',
