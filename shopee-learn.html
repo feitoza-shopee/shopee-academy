@@ -3564,6 +3564,11 @@ function ensureHSEFirst() {
     state.modules.splice(1, 0, PALETEIRA_MODULE);
   }
 
+  // Garante que o módulo HSE Líderes exista para todos os usuários
+  if(typeof HSE_LIDER_MODULE !== 'undefined' && !state.modules.some(m => m.id === HSE_LIDER_MODULE.id)) {
+    state.modules.splice(2, 0, HSE_LIDER_MODULE);
+  }
+
   // Fixa mod_paleteira na posição 1 (2º módulo, logo após HSE)
   const paleteiraIdx = state.modules.findIndex(m => m.id === 'mod_paleteira');
   if(paleteiraIdx > 1) {
@@ -7224,7 +7229,7 @@ const PALETEIRA_MODULE = {
   ]
 };
 
-
+const HSE_LIDER_MODULE = {
   id: 'mod_hse_lider',
   title: 'HSE para Líderes — Saúde, Segurança e Meio Ambiente',
   description: 'Conteúdo avançado de HSE com foco na atuação do Líder: EPIs, prevenção de acidentes, ergonomia e gestão de riscos.',
