@@ -1387,7 +1387,7 @@ async function initData() {
   });
 
   // Modules DB — seed PDF modules if missing, preserve admin-created ones
-  const PDF_MODULES_VERSION = 'v9';
+  const PDF_MODULES_VERSION = 'v10';
   const seededVersion = localStorage.getItem('sa_modules_version');
   const needsReseed = seededVersion !== PDF_MODULES_VERSION;
 
@@ -1847,6 +1847,288 @@ async function initData() {
                 answer:3,
                 explanation:'É proibido auxiliar o motorista, abrir/fechar portas do baú e validar dados pelo ajudante. A ação correta ao identificar irregularidades é abrir um OPA e comunicar a liderança ou HSE.'
               }
+            ]
+          },
+          {
+            id: 'paleteira_l1', title: 'Inspeção e Condução Segura da Paleteira',
+            description: 'Checklist pré-uso, postura de condução e regras básicas de circulação',
+            xpReward: 110,
+            questions: [
+              { type:'multiple', q:'Antes de iniciar o uso de uma paleteira, qual procedimento o operador deve realizar?',
+                options:['Usar direto, sem verificação prévia','Realizar checklist pré-uso, verificando rodas, garfos, sistema hidráulico e freio','Apenas verificar se está carregada (paleteira elétrica)','Aguardar autorização verbal do líder a cada uso'],
+                answer:1, explanation:'O checklist pré-uso (rodas, garfos, sistema hidráulico/elétrico e freio) é obrigatório antes de qualquer operação, para identificar falhas que possam causar acidentes.' },
+              { type:'truefalse', q:'Ao conduzir a paleteira hidráulica manual, o operador deve ficar posicionado à frente do timão, puxando-a, e nunca empurrando de trás sem visibilidade.',
+                answer:true, explanation:'Correto. Conduzir puxando, à frente do timão, garante visibilidade do trajeto e controle da carga, reduzindo o risco de colisões e atropelamentos.' },
+              { type:'multiple', q:'O que deve ser feito ao estacionar a paleteira após o uso?',
+                options:['Deixá-la no meio do corredor para facilitar o próximo uso','Abaixar os garfos totalmente, acionar o freio (se houver) e deixá-la em local sinalizado, fora da rota de circulação','Deixar os garfos erguidos para liberar espaço no piso','Deixar conectada à tomada mesmo sendo paleteira manual'],
+                answer:1, explanation:'Garfos abaixados, freio acionado e local sinalizado evitam tropeços, danos ao equipamento e bloqueio de rotas de emergência.' },
+              { type:'truefalse', q:'É permitido transportar pessoas sobre os garfos ou na plataforma da paleteira.',
+                answer:false, explanation:'Nunca. Paleteiras são equipamentos para movimentação de carga, não de pessoas. Transportar pessoas é uma violação grave de segurança.' },
+              { type:'multiple', q:'Em uma esquina ou cruzamento de corredores, qual conduta é a correta ao operar a paleteira?',
+                options:['Acelerar para passar rápido antes de outro equipamento','Buzinar/avisar, reduzir a velocidade e dar preferência a quem já está cruzando','Ignorar, já que paleteiras manuais não geram risco de colisão','Fechar os olhos momentaneamente na curva'],
+                answer:1, explanation:'Reduzir velocidade e sinalizar em cruzamentos previne colisões com outros equipamentos, cargas e pessoas — mesmo em paleteiras manuais.' }
+            ]
+          },
+          {
+            id: 'paleteira_l2', title: 'Movimentação de Cargas e Limites de Segurança da Paleteira',
+            description: 'Capacidade de carga, estabilidade do palete e normas regulamentadoras (NR-11/NR-12)',
+            xpReward: 120,
+            questions: [
+              { type:'multiple', q:'Qual o principal risco ao exceder a capacidade de carga indicada na placa da paleteira?',
+                options:['Nenhum risco, pois as paleteiras têm margem extra de segurança não informada','Sobrecarga do sistema hidráulico/elétrico, perda de estabilidade e tombamento da carga','Apenas desgaste estético do equipamento','Redução do tempo de recarga da bateria'],
+                answer:1, explanation:'Exceder a capacidade indicada pode causar falha do sistema hidráulico/elétrico, perda de estabilidade e tombamento, com risco grave de acidente.' },
+              { type:'truefalse', q:'Antes de erguer a carga, o operador deve verificar se o palete está bem encaixado e centralizado nos garfos.',
+                answer:true, explanation:'Correto. Um palete mal encaixado ou descentralizado pode desequilibrar a carga durante o deslocamento, aumentando o risco de queda.' },
+              { type:'multiple', q:'De acordo com a NR-11, o que deve ser priorizado na movimentação de materiais com equipamentos como a paleteira?',
+                options:['Velocidade máxima de operação para ganho de produtividade','Segurança na movimentação, armazenagem e manuseio de materiais, com operadores capacitados','Uso do equipamento por qualquer colaborador, capacitado ou não','Movimentação apenas em horários de menor circulação'],
+                answer:1, explanation:'A NR-11 trata da segurança no transporte, movimentação, armazenagem e manuseio de materiais, exigindo capacitação adequada dos operadores.' },
+              { type:'truefalse', q:'Descer rampas com a paleteira carregada de marcha à ré (carga atrás) é uma prática recomendada para manter o controle do equipamento.',
+                answer:true, explanation:'Correto. Em descidas, manter a carga "atrás" (ré) ajuda a controlar o equipamento e evita que a carga ganhe impulso e fuja do controle do operador.' },
+              { type:'order', q:'Ordene corretamente os passos para erguer e transportar uma carga com a paleteira:',
+                steps:[
+                  'Posicionar os garfos totalmente sob o palete, alinhados e centralizados',
+                  'Acionar a bomba/sistema para erguer a carga a uma altura segura de deslocamento',
+                  'Verificar estabilidade da carga e visibilidade do trajeto',
+                  'Conduzir a paleteira na velocidade adequada até o destino'
+                ],
+                correctOrder:[0,1,2,3],
+                explanation:'A sequência correta é: posicionar os garfos → erguer a carga a altura segura → verificar estabilidade e visibilidade → conduzir até o destino.' },
+              { type:'multiple', q:'Qual é a conduta correta caso o operador identifique um vazamento de óleo hidráulico ou falha elétrica na paleteira?',
+                options:['Continuar usando até o fim do turno e reportar depois','Interromper o uso imediatamente, sinalizar o equipamento e comunicar ao líder/manutenção','Tentar reparar o equipamento por conta própria','Ignorar se o vazamento for pequeno'],
+                answer:1, explanation:'Qualquer falha identificada (vazamento, problema elétrico, etc.) exige interrupção imediata do uso, sinalização e comunicação para manutenção, conforme a NR-12.' }
+            ]
+          },
+          {
+            id:'mod_hse_l3',
+            title:'Comunicação de Riscos e Comportamento Seguro',
+            description:'Vazamentos, EPI, programa OPA, trajeto e atos faltosos de alto risco',
+            xpReward:120,
+            questions:[
+              { type:'multiple', q:'Durante o trabalho na esteira, um colaborador percebe que a caixa que vai manusear está com embalagem danificada e possivelmente com produto químico vazando. O que ele deve fazer?',
+                options:['Manusear normalmente, pois a situação não parece grave.','Afastar o item da esteira e retornar ao trabalho sem comunicar.','Parar imediatamente a atividade, isolar o item e comunicar ao líder e ao time de HSE.','Usar a luva e continuar o processo para não atrasar a operação.'],
+                answer:2, explanation:'Suspeita de vazamento químico exige parada imediata da atividade, isolamento do item e comunicação ao líder e ao time de HSE — nunca manuseio direto ou continuidade do processo.' },
+              { type:'multiple', q:'Qual dos itens abaixo NÃO é permitido durante o trabalho nas esteiras ou sorter?',
+                options:['Uso de calçado de segurança (EPI obrigatório).','Cabelo preso em coque com xuxinha.','Uso de prendedor de metal tipo "piranha" no cabelo.','Bermuda na altura do joelho.'],
+                answer:2, explanation:'Prendedores de metal tipo "piranha" são proibidos nas áreas de esteira/sorter pelo risco de queda em pacotes e de prensagem nos equipamentos. Calçado de segurança e cabelo preso com xuxinha são permitidos/obrigatórios.' },
+              { type:'multiple', q:'Sobre o uso de EPI, qual das afirmativas abaixo está CORRETA segundo as normas da empresa?',
+                options:['O colaborador pode optar por não usar o EPI se achar que o risco é pequeno.','O EPI deve ser usado apenas nas áreas de maior risco, como a esteira.','O uso correto do EPI é obrigação do colaborador; recusar sem justificativa é considerado ato faltoso.','A empresa pode ser penalizada, mas o colaborador não.'],
+                answer:2, explanation:'O uso correto do EPI é obrigatório em toda a operação. A recusa sem justificativa é classificada como ato faltoso, podendo gerar advertência ou suspensão conforme a Matriz de Consequência.' },
+              { type:'multiple', q:'Um colaborador está na área de Sorting Esteira e observa que uma gaiola está mal posicionada, podendo atingir pessoas. Qual atitude está alinhada à cultura de segurança da empresa?',
+                options:['Ignorar e continuar trabalhando; não é sua função corrigir.','Registrar a situação no programa OPA e comunicar a liderança.','Empurrar a gaiola com o pé para desobstruir a passagem.','Aguardar o turno seguinte para reportar.'],
+                answer:1, explanation:'Qualquer colaborador pode e deve registrar desvios no programa OPA e comunicar a liderança imediatamente, sem esperar que um acidente ocorra.' },
+              { type:'multiple', q:'Sobre o transporte em motocicleta dentro do condomínio, qual regra deve ser seguida?',
+                options:['O capacete só é obrigatório nas vias públicas, não nas áreas internas.','O motociclista deve usar capacete nas áreas internas do condomínio e respeitar a sinalização.','Não há limite de velocidade definido nas áreas internas.','O uso de celular durante o deslocamento é permitido se for apenas para olhar o caminho.'],
+                answer:1, explanation:'O uso de capacete e o respeito à sinalização de trânsito são obrigatórios em toda a área do condomínio, incluindo as vias internas.' },
+              { type:'multiple', q:'Ao constatar uma situação de risco grave e iminente que possa causar lesão séria, o colaborador:',
+                options:['Deve continuar trabalhando e anotar o ocorrido ao final do turno.','Pode interromper a atividade, informar imediatamente o superior e ajudar a resolver a situação.','Deve acionar os bombeiros antes de qualquer outra ação.','Só pode parar se tiver autorização prévia do gestor.'],
+                answer:1, explanation:'Diante de risco grave e iminente, o colaborador pode interromper a atividade por conta própria, informar o superior imediatamente e auxiliar na resolução, sem precisar de autorização prévia.' },
+              { type:'multiple', q:'Qual das situações abaixo configura um ato faltoso de alto risco, podendo gerar suspensão imediata na primeira ocorrência?',
+                options:['Caminhar fora da faixa de pedestre.','Manter unhas ligeiramente longas em área operacional.','Operar uma paleteira elétrica sem ter recebido treinamento e autorização.','Não usar adorno (relógio) apenas em um dia.'],
+                answer:2, explanation:'Operar equipamentos como a paleteira elétrica sem treinamento e autorização é falta de alto risco, podendo gerar suspensão já na primeira ocorrência, conforme a Matriz de Consequência.' },
+              { type:'truefalse', q:'Qualquer ocorrência de acidente ou quase-acidente deve ser comunicada imediatamente ao líder e ao time de HSE. Deixar de comunicar pode prejudicar o próprio colaborador e impedir a investigação correta.',
+                answer:true, explanation:'Correto. A comunicação imediata permite o atendimento adequado, a investigação da causa raiz e a prevenção de novas ocorrências.' },
+              { type:'truefalse', q:'Na área de esteiras, é permitido usar prendedores de cabelo de metal (tipo "piranha" ou "tic-tac") desde que o cabelo esteja preso.',
+                answer:false, explanation:'Incorreto. Prendedores de metal são proibidos na área de esteiras independentemente do cabelo estar preso, pelo risco de queda em pacotes e de prensagem.' },
+              { type:'truefalse', q:'O colaborador que identifica uma condição insegura mas não se sentir seguro para corrigi-la sozinho pode e deve registrar a situação no programa OPA e comunicar sua liderança, sem precisar aguardar que um acidente aconteça.',
+                answer:true, explanation:'Correto. O programa OPA existe justamente para registrar desvios preventivamente, antes que se tornem acidentes.' },
+              { type:'truefalse', q:'A empresa é responsável por fornecer os EPIs gratuitamente e em boas condições. O colaborador, por sua vez, tem obrigação de usá-los corretamente, conservá-los e avisar se estiverem danificados.',
+                answer:true, explanation:'Correto. O fornecimento gratuito é dever da empresa (NR-6); o uso correto, a conservação e a comunicação de danos são responsabilidades do colaborador.' }
+            ]
+          },
+          {
+            id:'mod_hse_l4',
+            title:'Acidentes de Trajeto, Equipamentos e Regras de Ouro',
+            description:'Trajeto, ato faltoso, docas, paleteiras e comportamentos proibidos',
+            xpReward:120,
+            questions:[
+              { type:'truefalse', q:'Acidentes que ocorrem no trajeto entre a residência e o trabalho (como queda de motocicleta ou atropelamento) NÃO são considerados acidentes de trabalho e não geram direitos ao colaborador.',
+                answer:false, explanation:'Incorreto. Acidentes de Trajeto SÃO considerados acidentes de trabalho e geram os mesmos direitos, exigindo inclusive a emissão da CAT.' },
+              { type:'truefalse', q:'Operar máquinas e equipamentos — como paleteiras elétricas, rebocadores ou esteiras telescópicas — sem treinamento e autorização prévia é uma infração de alto risco, passível de suspensão já na primeira ocorrência.',
+                answer:true, explanation:'Correto. A operação de equipamentos sem treinamento e autorização é classificada como falta de alto risco na Matriz de Consequência.' },
+              { type:'truefalse', q:'A Ginástica Laboral é uma atividade opcional que não tem relação com a prevenção de acidentes; seu único objetivo é melhorar o bem-estar emocional dos colaboradores.',
+                answer:false, explanation:'Incorreto. A Ginástica Laboral previne lesões osteomusculares (LER/DORT) e está diretamente ligada à prevenção de acidentes e doenças ocupacionais, além de contribuir para o bem-estar.' },
+              { type:'multiple', q:'Durante uma manobra na doca, um colaborador permanece próximo ao caminhão para agilizar o processo.',
+                options:['Correto, desde que utilize EPI.','Correto, se estiver acompanhando o motorista.','Incorreto, pois é proibido permanecer na área da doca durante manobras.','Correto em horários de baixo fluxo.'],
+                answer:2, explanation:'É proibido permanecer na área da doca durante manobras de veículos, independentemente do uso de EPI ou do horário, pelo risco de esmagamento e atropelamento.' },
+              { type:'multiple', q:'Antes de iniciar uma descarga, o colaborador percebe que o caminhão não está calçado. O colaborador:',
+                options:['Pode iniciar a descarga normalmente.','Deve aguardar a instalação do calço e retenção da chave.','Pode iniciar se o motorista estiver presente.','Pode iniciar apenas a descarga manual.'],
+                answer:1, explanation:'A descarga só pode começar após o calço nas rodas e a retenção da chave do veículo, evitando movimentação acidental do caminhão durante a operação.' },
+              { type:'multiple', q:'Um colaborador sem treinamento solicita utilizar a paleteira elétrica. Essa ação é:',
+                options:['Permitido se acompanhado.','Permitido por pouco tempo.','Permitido em situações emergenciais.','Não é permitido.'],
+                answer:3, explanation:'A operação de paleteira elétrica exige treinamento e autorização prévios. Sem isso, não é permitido sob nenhuma circunstância.' },
+              { type:'multiple', q:'Durante o deslocamento na operação, um colaborador utiliza o celular enquanto caminha. Essa ação é:',
+                options:['Permitida.','Permitido em corredores.','Proibido.','Permitido quando não estiver carregando volumes.'],
+                answer:2, explanation:'O uso do celular durante o deslocamento é proibido, pois reduz a atenção ao ambiente e aumenta o risco de colisões, quedas e atropelamentos.' },
+              { type:'multiple', q:'Ao identificar uma atividade insegura realizada por um colega, você deve:',
+                options:['Ignorar.','Corrigir de forma respeitosa e comunicar a liderança quando necessário.','Filmar a situação.','Apenas comentar após o turno.'],
+                answer:1, explanation:'A correção respeitosa no momento e a comunicação à liderança, quando necessário, fazem parte da cultura de cuidado mútuo com a segurança.' },
+              { type:'multiple', q:'Qual Regra de Ouro está relacionada à movimentação de pacotes, pallets e gaiolas?',
+                options:['Segurança é um valor inegociável.','Não permanecer na doca.','Cuidar da própria segurança e da segurança dos colegas.','Não alterar dispositivos de segurança.'],
+                answer:2, explanation:'Cuidar da própria segurança e da segurança dos colegas é o princípio que orienta a movimentação correta de pacotes, pallets e gaiolas, prevenindo lesões a si e a terceiros.' },
+              { type:'multiple', q:'Um colaborador remove uma proteção de segurança para realizar uma atividade mais rapidamente. Essa movimentação é permitida?',
+                options:['Correto se recolocar depois.','Permitido pela liderança.','Somente o time da manutenção pode alterar dispositivos de segurança.','Comportamento proibido.'],
+                answer:3, explanation:'Remover ou alterar dispositivos de segurança é comportamento proibido para qualquer colaborador. Apenas a manutenção, seguindo procedimento formal, pode intervir nesses dispositivos.' }
+            ]
+          },
+          {
+            id:'mod_hse_l5',
+            title:'Cultura de Segurança e Movimentação de Gaiolas',
+            description:'Valor da segurança, comunicação de desvios e regras de uso de gaiolas',
+            xpReward:130,
+            questions:[
+              { type:'multiple', q:'Segurança é um valor inegociável significa que:',
+                options:['Segurança vem antes da produtividade.','Segurança depende da liderança.','Segurança é responsabilidade apenas do HSE.','Segurança é aplicada apenas em atividades críticas.'],
+                answer:0, explanation:'O princípio significa que a segurança nunca deve ser sacrificada em nome da produtividade ou de prazos, em nenhuma atividade.' },
+              { type:'multiple', q:'Ao identificar uma condição insegura na operação, o correto é:',
+                options:['Ignorar.','Corrigir apenas se for sua área.','Comunicar imediatamente.','Aguardar o final do turno.'],
+                answer:2, explanation:'Condições inseguras devem ser comunicadas imediatamente, independentemente da área, para permitir a correção rápida e evitar acidentes.' },
+              { type:'multiple', q:'Todo acidente, incidente ou quase acidente deve:',
+                options:['Ser comunicado imediatamente.','Ser comunicado apenas se houver lesão.','Ser registrado apenas pela liderança.','Ser comunicado no final da semana.'],
+                answer:0, explanation:'Toda ocorrência — com ou sem lesão — deve ser comunicada de imediato, permitindo a investigação e a adoção de medidas preventivas.' },
+              { type:'multiple', q:'Durante a movimentação, uma gaiola está com uma das portas abertas. Esse procedimento está correto?',
+                options:['Sim, se estiver vazia.','Sim, em trajetos curtos.','Não.','Sim, quando estiver sem lacre.'],
+                answer:2, explanation:'A gaiola deve ser movimentada sempre com as portas fechadas, independentemente de estar vazia, do trajeto ou da presença de lacre, para evitar prensagem e queda de itens.' },
+              { type:'multiple', q:'Qual é a forma correta de conduzir uma gaiola?',
+                options:['Pela frente do corpo.','Pela lateral do corpo.','Pela porta.','Pelo engate.'],
+                answer:1, explanation:'A condução deve ser feita pela lateral do corpo, garantindo visibilidade do trajeto e reduzindo o risco de prensagem das mãos e dos pés.' },
+              { type:'multiple', q:'Ao estacionar uma gaiola, é obrigatório:',
+                options:['Abrir as portas.','Travar as rodas.','Remover o lacre.','Encostar em outra gaiola.'],
+                answer:1, explanation:'Travar as rodas ao estacionar evita a movimentação acidental da gaiola e reduz o risco de colisão com pessoas ou outros equipamentos.' },
+              { type:'multiple', q:'Qual o limite máximo de gaiolas vazias engatadas?',
+                options:['3','4','5','6'],
+                answer:2, explanation:'O limite máximo é de 5 gaiolas vazias engatadas por vez, conforme a NR-11. Gaiolas cheias devem ser movimentadas uma a uma.' },
+              { type:'multiple', q:'Um colaborador teve o dedo prensado ao fechar a porta da gaiola. Qual foi a principal causa?',
+                options:['Falta de atenção à zona de prensagem.','Falta de lacre.','Falta de scanner.','Falta de treinamento em informática.'],
+                answer:0, explanation:'A falta de atenção à zona de prensagem ao fechar a porta é a principal causa desse tipo de acidente. As mãos devem ficar fora da linha de fechamento.' },
+              { type:'multiple', q:'O engate da gaiola atingiu o pé de um colaborador causando luxação. Qual comportamento poderia ter evitado o acidente?',
+                options:['Maior velocidade.','Atenção ao trajeto e movimentação correta.','Uso de lacre.','Utilização de duas gaiolas.'],
+                answer:1, explanation:'Atenção ao trajeto e a condução correta da gaiola, mantendo distância segura entre o engate e os pés, evitam esse tipo de acidente.' },
+              { type:'multiple', q:'Ao identificar uma gaiola com defeito nas rodas, você deve:',
+                options:['Continuar utilizando.','Utilizar somente vazias.','Comunicar imediatamente a liderança.','Solicitar que outro colaborador utilize.'],
+                answer:2, explanation:'Equipamentos com defeito devem ser retirados de uso e a liderança deve ser comunicada imediatamente para providenciar manutenção ou substituição.' },
+              { type:'multiple', q:'Qual risco existe ao movimentar uma gaiola segurando pela porta?',
+                options:['Nenhum.','Aprisionamento de mãos e perda de controle.','Apenas desgaste do equipamento.','Apenas lentidão operacional.'],
+                answer:1, explanation:'Segurar a gaiola pela porta pode causar aprisionamento das mãos caso a porta se mova e ainda reduz o controle sobre a direção do equipamento.' }
+            ]
+          },
+          {
+            id:'mod_hse_l6',
+            title:'Uso da Patinha e Movimentação de Pallets',
+            description:'Condução correta da patinha, estacionamento e regras de manuseio de pallets',
+            xpReward:130,
+            questions:[
+              { type:'multiple', q:'Como a patinha deve ser conduzida?',
+                options:['Pela frente do corpo.','Pela lateral do corpo.','Com apenas uma mão.','Correndo.'],
+                answer:1, explanation:'A condução pela lateral do corpo garante visibilidade do trajeto e maior controle do equipamento, reduzindo o risco de colisões.' },
+              { type:'multiple', q:'Após a utilização, a patinha deve ser:',
+                options:['Deixada na área.','Encostada em uma parede.','Estacionada, travada e com a manopla para baixo.','Deixada próxima à doca.'],
+                answer:2, explanation:'A patinha deve ser estacionada em local apropriado, com as travas acionadas e a manopla abaixada, evitando tropeços e obstrução de rotas.' },
+              { type:'multiple', q:'Uma colaboradora perdeu o controle da patinha e o equipamento passou sobre seu pé. Qual foi a principal falha?',
+                options:['Condução inadequada.','Falta de lacre.','Falta de scanner.','Falta de endereço.'],
+                answer:0, explanation:'A perda de controle do equipamento está diretamente relacionada à condução inadequada, geralmente por falta de atenção ao trajeto ou postura incorreta.' },
+              { type:'multiple', q:'Ao conduzir uma patinha carregada, o operador deve:',
+                options:['Manter atenção ao trajeto e realizar a puxada pela lateral do corpo.','Utilizar celular.','Correr.','Empurrar pela frente.'],
+                answer:0, explanation:'A atenção ao trajeto e a puxada pela lateral do corpo garantem visibilidade e controle, prevenindo colisões e atropelamentos.' },
+              { type:'multiple', q:'Uma patinha colidiu com um pallet e atingiu o tornozelo de uma colaboradora. O que contribuiu para o acidente?',
+                options:['Falta de atenção ao trajeto.','Falta de EPI auditivo.','Falta de lacre.','Falta de iluminação.'],
+                answer:0, explanation:'A falta de atenção ao trajeto é a causa mais comum de colisões durante a movimentação de equipamentos como a patinha.' },
+              { type:'multiple', q:'Qual comportamento é considerado inseguro durante a utilização da patinha?',
+                options:['Conduzi-la pela lateral.','Respeitar o fluxo.','Utilizar o celular durante o deslocamento.','Estacioná-la corretamente.'],
+                answer:2, explanation:'O uso do celular durante o deslocamento desvia a atenção do operador e é considerado comportamento inseguro.' },
+              { type:'multiple', q:'Ao identificar defeito na patinha, o operador deve:',
+                options:['Continuar utilizando.','Adaptar o equipamento.','Comunicar liderança.','Utilizar apenas para cargas leves.'],
+                answer:2, explanation:'Qualquer defeito identificado deve ser comunicado imediatamente à liderança, retirando o equipamento de uso até a manutenção.' },
+              { type:'multiple', q:'É permitido subir ou apoiar-se em pallets?',
+                options:['Sim.','Apenas pallets vazios.','Não.','Apenas com autorização.'],
+                answer:2, explanation:'Nunca é permitido subir ou se apoiar em pallets, pelo risco de queda, instabilidade da carga e prensagem dos pés nas frestas.' },
+              { type:'multiple', q:'A movimentação manual de pallets deve ser realizada:',
+                options:['Individualmente.','Em dupla.','Apenas pela liderança.','Apenas pela manutenção.'],
+                answer:1, explanation:'A movimentação manual de pallets deve ser feita em dupla, distribuindo o esforço e reduzindo o risco de lesões.' },
+              { type:'multiple', q:'Uma colaboradora teve o pé preso na fresta de um pallet. Qual regra ajudaria a evitar o acidente?',
+                options:['Não pisar nem se apoiar em pallets.','Utilizar mais lacres.','Utilizar duas luvas.','Movimentar mais rápido.'],
+                answer:0, explanation:'A regra de nunca pisar ou se apoiar em pallets evita justamente esse tipo de acidente, com o pé ficando preso nas frestas da estrutura.' },
+              { type:'multiple', q:'Ao identificar um pallet danificado, o correto é:',
+                options:['Continuar utilizando.','Encaminhar para área de descarte.','Empilhar outro pallet sobre ele.','Utilizar apenas vazios.'],
+                answer:1, explanation:'Pallets danificados devem ser retirados de uso e encaminhados para a área de descarte, evitando quedas e instabilidade de cargas.' },
+              { type:'multiple', q:'Qual risco está associado ao uso inadequado de pallets?',
+                options:['Quedas e torções.','Erro de sistema.','Falha de inventário.','Perda de rastreabilidade.'],
+                answer:0, explanation:'O uso inadequado de pallets — como pisar, apoiar-se ou usar pallets danificados — está diretamente associado a quedas e torções.' }
+            ]
+          },
+          {
+            id:'mod_hse_l7',
+            title:'Tratativas Químicas e Perfurocortantes',
+            description:'Vazamentos, materiais quebrados, EPIs específicos e descarte de perfurocortantes',
+            xpReward:110,
+            questions:[
+              { type:'multiple', q:'Você identifica uma embalagem úmida e com odor forte. O que deve ser feito?',
+                options:['Encaminhar normalmente.','Abrir para verificar.','Acionar imediatamente o time de tratativas.','Colocar em uma gaiola comum.'],
+                answer:2, explanation:'Embalagens com sinais de vazamento (umidade e odor forte) exigem acionamento imediato do time de tratativas, sem manuseio ou abertura pelo colaborador comum.' },
+              { type:'multiple', q:'Quem está autorizado a tratar vazamentos químicos?',
+                options:['Qualquer colaborador.','Apenas líderes.','Time de tratativas.','Operadores de indução.'],
+                answer:2, explanation:'Apenas o time de tratativas, capacitado e com os EPIs adequados, está autorizado a manusear vazamentos químicos.' },
+              { type:'multiple', q:'Ao identificar vidro quebrado no chão da operação:',
+                options:['Recolher sozinho.','Isolar a área e acionar o time de tratativas.','Empurrar para um canto.','Continuar trabalhando.'],
+                answer:1, explanation:'A área deve ser isolada e o time de tratativas acionado para o recolhimento seguro do material, evitando cortes e ferimentos.' },
+              { type:'multiple', q:'Qual luva deve ser utilizada para tratativas químicas?',
+                options:['Algodão.','Vaqueta.','Nitrílica.','Malha.'],
+                answer:2, explanation:'A luva nitrílica oferece resistência a produtos químicos e é a indicada para esse tipo de tratativa, diferente das luvas de algodão, vaqueta ou malha.' },
+              { type:'multiple', q:'Uma tinta estourou na esteira. Qual procedimento correto?',
+                options:['Limpar sozinho.','Acionar o time de tratativas.','Cobrir com papelão.','Continuar a operação.'],
+                answer:1, explanation:'Vazamentos de produtos químicos como tinta devem ser tratados exclusivamente pelo time de tratativas, capacitado para esse tipo de ocorrência.' },
+              { type:'multiple', q:'Um perfurocortante dentro de uma saca cortou o joelho de um colaborador. Qual foi a principal causa?',
+                options:['Acondicionamento inadequado.','Falta de lacre.','Falta de scanner.','Falta de espaço.'],
+                answer:0, explanation:'O acondicionamento inadequado do perfurocortante, sem proteção ou embalagem específica, é a principal causa desse tipo de acidente.' },
+              { type:'multiple', q:'Ao identificar um perfurocortante mal embalado:',
+                options:['Encaminhar normalmente.','Encaminhar para tratativas.','Arremessar para a gaiola.','Colocar em uma saca.'],
+                answer:1, explanation:'Itens perfurocortantes mal embalados devem ser encaminhados para o time de tratativas, que fará o acondicionamento adequado e seguro.' },
+              { type:'multiple', q:'Qual o principal risco de um perfurocortante fora da embalagem adequada?',
+                options:['Corte e perfuração.','Extravio.','Atraso operacional.','Erro sistêmico.'],
+                answer:0, explanation:'Sem a embalagem adequada, o perfurocortante representa risco direto de corte e perfuração para quem manuseia o item.' }
+            ]
+          },
+          {
+            id:'mod_hse_l8',
+            title:'Movimentação de Volumosos e Responsabilidade de Todos',
+            description:'Manuseio de volumosos, descarte de pacotes avariados e EPIs obrigatórios',
+            xpReward:130,
+            questions:[
+              { type:'multiple', q:'Um pacote volumoso atingiu o antebraço de um colaborador. Qual foi a causa mais provável?',
+                options:['Manuseio inadequado.','Falta de etiqueta.','Falta de scanner.','Falta de lacre.'],
+                answer:0, explanation:'O manuseio inadequado — sem técnica correta ou apoio adequado — é a causa mais comum de acidentes na movimentação de volumosos.' },
+              { type:'multiple', q:'Ao movimentar um volumoso acima da sua capacidade física, você deve:',
+                options:['Arrastar.','Solicitar auxílio.','Arremessar.','Movimentar sozinho.'],
+                answer:1, explanation:'Quando o peso ou tamanho excede a capacidade física do colaborador, o correto é solicitar auxílio, evitando lesões.' },
+              { type:'multiple', q:'Um halter caiu sobre o pé de um colaborador. Qual procedimento poderia ter evitado o acidente?',
+                options:['Avaliar peso e movimentar em dupla.','Utilizar lacres.','Aumentar velocidade.','Reduzir o percurso.'],
+                answer:0, explanation:'Avaliar o peso do item antes de movimentá-lo e contar com auxílio de outro colaborador reduz significativamente o risco de quedas sobre os pés.' },
+              { type:'multiple', q:'Quando necessário, um volumoso deve ser movimentado:',
+                options:['Individualmente.','Em dupla.','Pela liderança.','Pela manutenção.'],
+                answer:1, explanation:'Volumosos pesados ou de grande dimensão devem ser movimentados em dupla, distribuindo o esforço físico e reduzindo riscos.' },
+              { type:'multiple', q:'Dores e inchaço após movimentação de volumosos geralmente estão associados a:',
+                options:['Falta de rodízio na operação.','Falha de sistema.','Falta de scanner.','Falta de endereço.'],
+                answer:0, explanation:'A ausência de rodízio entre as funções aumenta a exposição repetitiva ao esforço físico, favorecendo dores e lesões musculoesqueléticas.' },
+              { type:'multiple', q:'Todo pacote avariado deve ser:',
+                options:['Encaminhado para tratativas.','Induzido novamente.','Armazenado.','Encaminhado à expedição.'],
+                answer:0, explanation:'Pacotes avariados devem seguir para o time de tratativas, que avalia o conteúdo e o destino correto, evitando riscos e perdas.' },
+              { type:'multiple', q:'Um pacote com embalagem rasgada e conteúdo exposto deve:',
+                options:['Seguir o fluxo normal.','Ser encaminhado para tratativas.','Ser armazenado temporariamente.','Ser induzido novamente.'],
+                answer:1, explanation:'Pacotes com embalagem rompida e conteúdo exposto devem ser direcionados para tratativas, e não seguir o fluxo normal da operação.' },
+              { type:'multiple', q:'É permitido arremessar pacotes?',
+                options:['Sim.','Apenas os leves.','Apenas em dupla.','Não.'],
+                answer:3, explanation:'Nunca é permitido arremessar pacotes, independentemente do peso, pelo risco de danos ao conteúdo e de lesões em quem estiver próximo.' },
+              { type:'multiple', q:'Um colaborador lançou uma saca por cima da gaiola e lesionou o punho. Qual regra foi descumprida?',
+                options:['Nunca arremessar pacotes.','Travar as rodas.','Fechar as portas.','Utilizar lacre.'],
+                answer:0, explanation:'A regra de nunca arremessar pacotes existe justamente para evitar lesões como essa, além de danos ao conteúdo transportado.' },
+              { type:'multiple', q:'Qual conjunto de EPI é obrigatório para atividades operacionais?',
+                options:['Bota, touca de proteção e luvas.','Apenas sapato.','Apenas luvas.','Apenas colete.'],
+                answer:0, explanation:'O conjunto básico obrigatório para atividades operacionais inclui bota de segurança, touca de proteção e luvas, conforme a função exercida.' },
+              { type:'multiple', q:'Qual é o EPI e o procedimento obrigatório para realizar atividades nas esteiras?',
+                options:['Utilizar touca de proteção e ter a camisa ensacada.','Colete.','Rede de cabelo.','Avental.'],
+                answer:0, explanation:'Nas esteiras, é obrigatório o uso de touca de proteção e manter a camisa ensacada (por dentro da calça), evitando que partes da roupa sejam puxadas pelo equipamento.' },
+              { type:'multiple', q:'A segurança na operação é responsabilidade:',
+                options:['Apenas da liderança.','Apenas do HSE.','Apenas dos operadores.','De todos os colaboradores.'],
+                answer:3, explanation:'A segurança é responsabilidade de todos os colaboradores, independentemente do cargo ou função, e não apenas da liderança, do HSE ou dos operadores.' }
             ]
           }
         ]
@@ -3471,13 +3753,27 @@ async function initData() {
       // Usa os módulos do Supabase como base e garante que pdfModules base estejam presentes
       const adminOnly = remoteModules.filter(m => !pdfModules.some(p => p.id === m.id));
       const merged = [...pdfModules.map(pm => {
-        // Se o admin editou um pdfModule (ex: reordenou lições, alterou perguntas), usa a versão remota
+        // Se a versão do código mudou (needsReseed), a nova versão do pdfModule (código)
+        // sempre prevalece sobre a versão antiga salva remotamente — garante que correções
+        // e novos conteúdos feitos no código sejam vistos por todos os usuários.
+        if(needsReseed) return pm;
+        // Caso contrário, se o admin editou um pdfModule (ex: reordenou lições, alterou perguntas), usa a versão remota
         const remote = remoteModules.find(r => r.id === pm.id);
         return remote ? remote : pm;
       }), ...adminOnly];
       state.modules = merged;
       ensureHSEFirst();
       localStorage.setItem('sa_modules', JSON.stringify(state.modules));
+      if(needsReseed) {
+        // Persiste a versão atualizada no Supabase para que TODOS os usuários (não só este navegador) recebam o novo conteúdo.
+        // Aguarda a escrita terminar para evitar que uma releitura (ex: ao fazer login) pegue a versão antiga ainda em cache no Supabase.
+        try {
+          const { error } = await getDB().from('app_config').upsert({ key: 'modules', value: JSON.stringify(state.modules) }, { onConflict: 'key' });
+          if(error) console.warn('Falha ao atualizar app_config (modules) com a nova versão:', error.message);
+        } catch(e) {
+          console.warn('Falha ao atualizar app_config (modules) com a nova versão:', e.message);
+        }
+      }
     } else {
       // Fallback: usa localStorage ou pdfModules padrão
       let existing = [];
@@ -3548,7 +3844,7 @@ function saveUsers() {
   // Legacy: save all users to Supabase
   Object.values(state.users).forEach(u => saveUser(u));
 }
-// Garante a ordem fixa: mod_hse (1º), mod_paleteira (2º) e mod_hse_lider (3º) em state.modules
+// Garante a ordem fixa: mod_hse (1º, já inclui o treinamento de paleteiras) e mod_hse_lider (2º) em state.modules
 function ensureHSEFirst() {
   if(!Array.isArray(state.modules)) return;
 
@@ -3559,28 +3855,20 @@ function ensureHSEFirst() {
     state.modules.unshift(hse);
   }
 
-  // Garante que o módulo de Treinamento de Paleteiras exista para todos os usuários
-  if(typeof PALETEIRA_MODULE !== 'undefined' && !state.modules.some(m => m.id === PALETEIRA_MODULE.id)) {
-    state.modules.splice(1, 0, PALETEIRA_MODULE);
-  }
+  // Remove qualquer módulo "Treinamento de Paleteiras" remanescente, pois seu conteúdo
+  // agora faz parte das lições do mod_hse (1º módulo)
+  state.modules = state.modules.filter(m => m.id !== 'mod_paleteira');
 
   // Garante que o módulo HSE Líderes exista para todos os usuários
   if(typeof HSE_LIDER_MODULE !== 'undefined' && !state.modules.some(m => m.id === HSE_LIDER_MODULE.id)) {
-    state.modules.splice(2, 0, HSE_LIDER_MODULE);
+    state.modules.splice(1, 0, HSE_LIDER_MODULE);
   }
 
-  // Fixa mod_paleteira na posição 1 (2º módulo, logo após HSE)
-  const paleteiraIdx = state.modules.findIndex(m => m.id === 'mod_paleteira');
-  if(paleteiraIdx > 1) {
-    const pal = state.modules.splice(paleteiraIdx, 1)[0];
-    state.modules.splice(1, 0, pal);
-  }
-
-  // Fixa mod_hse_lider na posição 2 (3º módulo, logo após HSE e Paleteiras)
+  // Fixa mod_hse_lider na posição 1 (2º módulo, logo após HSE)
   const liderIdx = state.modules.findIndex(m => m.id === 'mod_hse_lider');
-  if(liderIdx > 2) {
+  if(liderIdx > 1) {
     const lider = state.modules.splice(liderIdx, 1)[0];
-    state.modules.splice(2, 0, lider);
+    state.modules.splice(1, 0, lider);
   }
 }
 
@@ -5332,7 +5620,7 @@ function renderAdminModulesList() {
       <!-- Module header -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">
-          <button onclick="moveModule('${mod.id}',-1)" ${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'disabled':''} style="background:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'default':'pointer'};opacity:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mod.id==='mod_paleteira'||mi<=2)?'0.4':'1'};">▲</button>
+          <button onclick="moveModule('${mod.id}',-1)" ${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=1)?'disabled':''} style="background:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=1)?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=1)?'default':'pointer'};opacity:${(mod.id==='mod_hse'||mod.id==='mod_hse_lider'||mi<=1)?'0.4':'1'};">▲</button>
           <button onclick="moveModule('${mod.id}',1)" ${mi===state.modules.length-1?'disabled':''} style="background:${mi===state.modules.length-1?'#eee':'var(--bg)'};border:1.5px solid var(--border);border-radius:6px;padding:2px 7px;font-size:13px;cursor:${mi===state.modules.length-1?'default':'pointer'};opacity:${mi===state.modules.length-1?'0.4':'1'};">▼</button>
         </div>
         <div style="width:40px;height:40px;border-radius:10px;background:${mod.color};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${mod.icon}</div>
@@ -5378,11 +5666,11 @@ function renderAdminModulesList() {
 function moveModule(modId, direction) {
   const idx = state.modules.findIndex(m => m.id === modId);
   if(idx === -1) return;
-  // mod_hse (1º), mod_paleteira (2º) e mod_hse_lider (3º) são fixos — não podem ser movidos
-  if(modId === 'mod_hse' || modId === 'mod_hse_lider' || modId === 'mod_paleteira') return;
+  // mod_hse (1º, já inclui paleteiras) e mod_hse_lider (2º) são fixos — não podem ser movidos
+  if(modId === 'mod_hse' || modId === 'mod_hse_lider') return;
   const newIdx = idx + direction;
-  // Posições 0, 1 e 2 são reservadas ao HSE, HSE Líderes e Paleteiras
-  const fixedCount = state.modules.filter(m => m.id === 'mod_hse' || m.id === 'mod_hse_lider' || m.id === 'mod_paleteira').length;
+  // Posições 0 e 1 são reservadas ao HSE e HSE Líderes
+  const fixedCount = state.modules.filter(m => m.id === 'mod_hse' || m.id === 'mod_hse_lider').length;
   if(newIdx < fixedCount || newIdx >= state.modules.length) return;
 
   // Swap
@@ -7167,67 +7455,6 @@ function hasLives() {
   return (lives === undefined || lives === null) ? true : lives > 0;
 }
 
-// ============================================================
-// TREINAMENTO DE PALETEIRAS (2º módulo da trilha, obrigatório p/ todos)
-// ============================================================
-const PALETEIRA_MODULE = {
-  id: 'mod_paleteira',
-  title: 'Treinamento de Paleteiras',
-  description: 'Operação segura de paleteiras manuais e elétricas: inspeção, condução, movimentação de cargas e NRs aplicáveis.',
-  icon: '🛒',
-  color: 'linear-gradient(135deg,#2980B9,#1F618D)',
-  lessons: [
-    {
-      id: 'paleteira_l1', title: 'Inspeção e Condução Segura',
-      description: 'Checklist pré-uso, postura de condução e regras básicas de circulação',
-      xpReward: 110,
-      questions: [
-        { type:'multiple', q:'Antes de iniciar o uso de uma paleteira, qual procedimento o operador deve realizar?',
-          options:['Usar direto, sem verificação prévia','Realizar checklist pré-uso, verificando rodas, garfos, sistema hidráulico e freio','Apenas verificar se está carregada (paleteira elétrica)','Aguardar autorização verbal do líder a cada uso'],
-          answer:1, explanation:'O checklist pré-uso (rodas, garfos, sistema hidráulico/elétrico e freio) é obrigatório antes de qualquer operação, para identificar falhas que possam causar acidentes.' },
-        { type:'truefalse', q:'Ao conduzir a paleteira hidráulica manual, o operador deve ficar posicionado à frente do timão, puxando-a, e nunca empurrando de trás sem visibilidade.',
-          answer:true, explanation:'Correto. Conduzir puxando, à frente do timão, garante visibilidade do trajeto e controle da carga, reduzindo o risco de colisões e atropelamentos.' },
-        { type:'multiple', q:'O que deve ser feito ao estacionar a paleteira após o uso?',
-          options:['Deixá-la no meio do corredor para facilitar o próximo uso','Abaixar os garfos totalmente, acionar o freio (se houver) e deixá-la em local sinalizado, fora da rota de circulação','Deixar os garfos erguidos para liberar espaço no piso','Deixar conectada à tomada mesmo sendo paleteira manual'],
-          answer:1, explanation:'Garfos abaixados, freio acionado e local sinalizado evitam tropeços, danos ao equipamento e bloqueio de rotas de emergência.' },
-        { type:'truefalse', q:'É permitido transportar pessoas sobre os garfos ou na plataforma da paleteira.',
-          answer:false, explanation:'Nunca. Paleteiras são equipamentos para movimentação de carga, não de pessoas. Transportar pessoas é uma violação grave de segurança.' },
-        { type:'multiple', q:'Em uma esquina ou cruzamento de corredores, qual conduta é a correta ao operar a paleteira?',
-          options:['Acelerar para passar rápido antes de outro equipamento','Buzinar/avisar, reduzir a velocidade e dar preferência a quem já está cruzando','Ignorar, já que paleteiras manuais não geram risco de colisão','Fechar os olhos momentaneamente na curva'],
-          answer:1, explanation:'Reduzir velocidade e sinalizar em cruzamentos previne colisões com outros equipamentos, cargas e pessoas — mesmo em paleteiras manuais.' }
-      ]
-    },
-    {
-      id: 'paleteira_l2', title: 'Movimentação de Cargas e Limites de Segurança',
-      description: 'Capacidade de carga, estabilidade do palete e normas regulamentadoras (NR-11/NR-12)',
-      xpReward: 120,
-      questions: [
-        { type:'multiple', q:'Qual o principal risco ao exceder a capacidade de carga indicada na placa da paleteira?',
-          options:['Nenhum risco, pois as paleteiras têm margem extra de segurança não informada','Sobrecarga do sistema hidráulico/elétrico, perda de estabilidade e tombamento da carga','Apenas desgaste estético do equipamento','Redução do tempo de recarga da bateria'],
-          answer:1, explanation:'Exceder a capacidade indicada pode causar falha do sistema hidráulico/elétrico, perda de estabilidade e tombamento, com risco grave de acidente.' },
-        { type:'truefalse', q:'Antes de erguer a carga, o operador deve verificar se o palete está bem encaixado e centralizado nos garfos.',
-          answer:true, explanation:'Correto. Um palete mal encaixado ou descentralizado pode desequilibrar a carga durante o deslocamento, aumentando o risco de queda.' },
-        { type:'multiple', q:'De acordo com a NR-11, o que deve ser priorizado na movimentação de materiais com equipamentos como a paleteira?',
-          options:['Velocidade máxima de operação para ganho de produtividade','Segurança na movimentação, armazenagem e manuseio de materiais, com operadores capacitados','Uso do equipamento por qualquer colaborador, capacitado ou não','Movimentação apenas em horários de menor circulação'],
-          answer:1, explanation:'A NR-11 trata da segurança no transporte, movimentação, armazenagem e manuseio de materiais, exigindo capacitação adequada dos operadores.' },
-        { type:'truefalse', q:'Descer rampas com a paleteira carregada de marcha à ré (carga atrás) é uma prática recomendada para manter o controle do equipamento.',
-          answer:true, explanation:'Correto. Em descidas, manter a carga "atrás" (ré) ajuda a controlar o equipamento e evita que a carga ganhe impulso e fuja do controle do operador.' },
-        { type:'order', q:'Ordene corretamente os passos para erguer e transportar uma carga com a paleteira:',
-          steps:[
-            'Posicionar os garfos totalmente sob o palete, alinhados e centralizados',
-            'Acionar a bomba/sistema para erguer a carga a uma altura segura de deslocamento',
-            'Verificar estabilidade da carga e visibilidade do trajeto',
-            'Conduzir a paleteira na velocidade adequada até o destino'
-          ],
-          correctOrder:[0,1,2,3],
-          explanation:'A sequência correta é: posicionar os garfos → erguer a carga a altura segura → verificar estabilidade e visibilidade → conduzir até o destino.' },
-        { type:'multiple', q:'Qual é a conduta correta caso o operador identifique um vazamento de óleo hidráulico ou falha elétrica na paleteira?',
-          options:['Continuar usando até o fim do turno e reportar depois','Interromper o uso imediatamente, sinalizar o equipamento e comunicar ao líder/manutenção','Tentar reparar o equipamento por conta própria','Ignorar se o vazamento for pequeno'],
-          answer:1, explanation:'Qualquer falha identificada (vazamento, problema elétrico, etc.) exige interrupção imediata do uso, sinalização e comunicação para manutenção, conforme a NR-12.' }
-      ]
-    }
-  ]
-};
 
 const HSE_LIDER_MODULE = {
   id: 'mod_hse_lider',
