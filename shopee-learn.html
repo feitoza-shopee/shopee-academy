@@ -1350,7 +1350,9 @@ function rowToUser(row) {
     xp: row.xp || 0,
     streak: row.streak || 0,
     lives: (row.lives !== undefined && row.lives !== null) ? row.lives : 5,
-    livesDate: row.lives_date || '', // data em que as vidas foram esgotadas/usadas pela última vez
+    // Se a coluna lives_date não existir/estiver vazia no Supabase, usa o backup salvo
+    // localmente neste navegador para não perder a referência do último reset de vidas.
+    livesDate: row.lives_date || (() => { try { return localStorage.getItem('sa_livesdate_' + row.id) || ''; } catch(e) { return ''; } })(),
     lastActive: row.last_active || today(),
     completedLessons: (() => { try { return JSON.parse(row.completed_lessons || '[]'); } catch(e) { return []; } })(),
     quizProgress: (() => { try { return row.quiz_progress ? JSON.parse(row.quiz_progress) : null; } catch(e) { return null; } })(),
@@ -3806,7 +3808,12 @@ async function initData() {
 function today() {
   return new Date().toISOString().slice(0,10);
 }
+
 async function saveUser(user) {
+  // Backup local da data de renovação de vidas — funciona mesmo se a coluna
+  // lives_date ainda não existir no Supabase (evita travar a renovação diária).
+  try { localStorage.setItem('sa_livesdate_' + user.id, user.livesDate || ''); } catch(e) {}
+
   const row = {
     id: user.id,
     name: user.name,
