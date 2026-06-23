@@ -1387,7 +1387,7 @@ async function initData() {
   });
 
   // Modules DB — seed PDF modules if missing, preserve admin-created ones
-  const PDF_MODULES_VERSION = 'v9';
+  const PDF_MODULES_VERSION = 'v10';
   const seededVersion = localStorage.getItem('sa_modules_version');
   const needsReseed = seededVersion !== PDF_MODULES_VERSION;
 
@@ -3753,13 +3753,27 @@ async function initData() {
       // Usa os módulos do Supabase como base e garante que pdfModules base estejam presentes
       const adminOnly = remoteModules.filter(m => !pdfModules.some(p => p.id === m.id));
       const merged = [...pdfModules.map(pm => {
-        // Se o admin editou um pdfModule (ex: reordenou lições, alterou perguntas), usa a versão remota
+        // Se a versão do código mudou (needsReseed), a nova versão do pdfModule (código)
+        // sempre prevalece sobre a versão antiga salva remotamente — garante que correções
+        // e novos conteúdos feitos no código sejam vistos por todos os usuários.
+        if(needsReseed) return pm;
+        // Caso contrário, se o admin editou um pdfModule (ex: reordenou lições, alterou perguntas), usa a versão remota
         const remote = remoteModules.find(r => r.id === pm.id);
         return remote ? remote : pm;
       }), ...adminOnly];
       state.modules = merged;
       ensureHSEFirst();
       localStorage.setItem('sa_modules', JSON.stringify(state.modules));
+      if(needsReseed) {
+        // Persiste a versão atualizada no Supabase para que TODOS os usuários (não só este navegador) recebam o novo conteúdo.
+        // Aguarda a escrita terminar para evitar que uma releitura (ex: ao fazer login) pegue a versão antiga ainda em cache no Supabase.
+        try {
+          const { error } = await getDB().from('app_config').upsert({ key: 'modules', value: JSON.stringify(state.modules) }, { onConflict: 'key' });
+          if(error) console.warn('Falha ao atualizar app_config (modules) com a nova versão:', error.message);
+        } catch(e) {
+          console.warn('Falha ao atualizar app_config (modules) com a nova versão:', e.message);
+        }
+      }
     } else {
       // Fallback: usa localStorage ou pdfModules padrão
       let existing = [];
