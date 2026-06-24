@@ -4796,16 +4796,13 @@ async function finishQuiz() {
   const secs = elapsed%60;
   const accuracy = Math.round(q.correct/q.questions.length*100);
 
-  // Calculate XP — only awarded on 100% accuracy (lesson completion)
+  // Calculate XP — sempre proporcional aos acertos, com bônus por 100%
   let xpGained = 0;
-  if(accuracy === 100) {
-    xpGained = Math.round(lesson.xpReward * 1.5); // 1.5× bonus for perfect score
-  }
-
-  if(!u.isAdmin && xpGained > 0) {
-    u.xp += xpGained;
-  } else {
-    xpGained = 0;
+  if(!u.isAdmin && q.correct > 0) {
+    const base = Math.round((q.correct / q.questions.length) * lesson.xpReward);
+    const bonus = accuracy === 100 ? Math.round(lesson.xpReward * 0.5) : 0; // +50% de bônus por nota perfeita
+    xpGained = base + bonus;
+    u.xp = (u.xp || 0) + xpGained;
   }
   u.lives = q.lives;
 
@@ -4841,7 +4838,9 @@ async function finishQuiz() {
   document.getElementById('result-title').textContent   = accuracy===100?'Perfeito!':accuracy>=70?'Quase lá!':'Continue Tentando!';
   document.getElementById('result-subtitle').textContent = accuracy===100
     ? 'Lição concluída! A próxima foi desbloqueada. 🔓'
-    : 'Você precisa de 100% para concluir a lição e desbloquear a próxima. Tente novamente!';
+    : accuracy > 0
+      ? 'Você ganhou XP parcial! Acerte 100% para concluir a lição, desbloquear a próxima e ganhar bônus de XP!'
+      : 'Você precisa acertar ao menos uma questão para ganhar XP. Tente novamente!';
   document.getElementById('result-xp').textContent = '+'+xpGained;
   document.getElementById('result-accuracy').textContent = accuracy+'%';
   document.getElementById('result-time').textContent = mins+':'+(secs<10?'0':'')+secs;
