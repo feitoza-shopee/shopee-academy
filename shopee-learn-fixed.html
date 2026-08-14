@@ -7173,25 +7173,9 @@ async function renderUsersPanel() {
       </tr>`;
     }).join('');
 
-  // Calcula usuários com vidas travadas (apenas para diagnóstico informativo — sem opção de restaurar)
-  const todayStr2 = today();
-  const stuckUsers = allUsers.filter(u => {
-    const hasNoLives = (u.lives !== undefined && u.lives !== null) ? u.lives <= 0 : false;
-    const livesDateOld = !u.livesDate || u.livesDate !== todayStr2;
-    return hasNoLives && livesDateOld;
-  });
-
   pageEl.innerHTML = `
     <h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">👥 Relatório de Usuários</h2>
     <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:12px;">Nome, unidade, turno, cargo, XP, último acesso e % de conclusão do módulo HSE</p>
-
-    <!-- DIAGNÓSTICO DE VIDAS (somente informativo) -->
-    <div style="background:${stuckUsers.length > 0 ? '#FFF0EE' : '#EAFAF1'};border-radius:14px;padding:12px 16px;margin-bottom:14px;border:2px solid ${stuckUsers.length > 0 ? '#FFCCC4' : 'var(--green)'};">
-      <div style="font-weight:900;font-size:13px;color:${stuckUsers.length > 0 ? 'var(--shopee-dark)' : '#1E8449'};">
-        ${stuckUsers.length > 0 ? `⚠️ ${stuckUsers.length} usuário(s) com VIDAS TRAVADAS (0 vidas, livesDate desatualizado)` : '✅ Nenhum usuário com vidas travadas'}
-      </div>
-      ${stuckUsers.length > 0 ? `<div style="font-size:11px;color:var(--shopee-dark);margin-top:2px;font-weight:600;">${stuckUsers.map(u=>u.name).join(', ')}</div>` : ''}
-    </div>
 
     <!-- SEARCH (dispara apenas no ENTER) -->
     <div style="background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;border:2px solid var(--border);box-shadow:var(--shadow);">
