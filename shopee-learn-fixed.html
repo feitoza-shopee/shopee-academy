@@ -7137,10 +7137,18 @@ async function renderUsersPanel() {
 
   // % de conclusão do módulo HSE (sempre o primeiro módulo da trilha, mod_hse_lider)
   const hseMod = state.modules.find(m => m.id === 'mod_hse_lider') || state.modules[0];
+  // % HSE calculado pelo peso de cada PERGUNTA, não pelo peso de cada lição.
+  // Ex.: módulo com 64 perguntas no total -> cada pergunta vale 100/64 = 1,5625%.
+  // Assim, lições com mais perguntas pesam proporcionalmente mais na % final.
+  const hseTotalQuestions = hseMod && hseMod.lessons
+    ? hseMod.lessons.reduce((acc, l) => acc + (l.questions ? l.questions.length : 0), 0)
+    : 0;
   const hsePct = (u) => {
-    if(!hseMod || !hseMod.lessons || hseMod.lessons.length === 0) return 0;
-    const done = hseMod.lessons.filter(l => (u.completedLessons||[]).includes(l.id)).length;
-    return Math.round(done / hseMod.lessons.length * 100);
+    if(!hseMod || !hseMod.lessons || hseMod.lessons.length === 0 || hseTotalQuestions === 0) return 0;
+    const doneQuestions = hseMod.lessons
+      .filter(l => (u.completedLessons||[]).includes(l.id))
+      .reduce((acc, l) => acc + (l.questions ? l.questions.length : 0), 0);
+    return Math.round(doneQuestions / hseTotalQuestions * 100);
   };
 
   const tableRows = filtered
@@ -7357,10 +7365,18 @@ function exportTodayToExcel() {
   else                    periodLabel = today();
 
   const hseMod = state.modules.find(m => m.id === 'mod_hse_lider') || state.modules[0];
+  // % HSE calculado pelo peso de cada PERGUNTA, não pelo peso de cada lição.
+  // Ex.: módulo com 64 perguntas no total -> cada pergunta vale 100/64 = 1,5625%.
+  // Assim, lições com mais perguntas pesam proporcionalmente mais na % final.
+  const hseTotalQuestions = hseMod && hseMod.lessons
+    ? hseMod.lessons.reduce((acc, l) => acc + (l.questions ? l.questions.length : 0), 0)
+    : 0;
   const hsePct = (u) => {
-    if(!hseMod || !hseMod.lessons || hseMod.lessons.length === 0) return 0;
-    const done = hseMod.lessons.filter(l => (u.completedLessons||[]).includes(l.id)).length;
-    return Math.round(done / hseMod.lessons.length * 100);
+    if(!hseMod || !hseMod.lessons || hseMod.lessons.length === 0 || hseTotalQuestions === 0) return 0;
+    const doneQuestions = hseMod.lessons
+      .filter(l => (u.completedLessons||[]).includes(l.id))
+      .reduce((acc, l) => acc + (l.questions ? l.questions.length : 0), 0);
+    return Math.round(doneQuestions / hseTotalQuestions * 100);
   };
 
   const headers = ['Nome','Unidade','Turno','Cargo','XP','Último Acesso','% Conclusão HSE'];
