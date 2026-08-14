@@ -7152,9 +7152,6 @@ async function renderUsersPanel() {
       const livesVal = (u.lives !== undefined && u.lives !== null) ? u.lives : 5;
       const livesColor = livesVal <= 0 ? '#E74C3C' : livesVal <= 2 ? '#E67E22' : 'var(--green)';
       const livesLabel = livesVal <= 0 ? '💔 0' : '❤️ ' + livesVal;
-      const livesBtn = livesVal <= 0
-        ? `<button onclick="adminRestoreUserLives('${u.id}','${u.name.replace(/'/g,"&#39;")}')" style="background:var(--shopee);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;cursor:pointer;margin-right:4px;">❤️ Restaurar</button>`
-        : '';
       return `<tr style="border-bottom:1px solid var(--border);${livesVal <= 0 ? 'background:#FFF8F6;' : ''}">
         <td style="padding:10px 8px;font-size:13px;font-weight:700;">${safeName}</td>
         <td style="padding:10px 8px;font-size:12px;color:var(--text2);">${u.unit||''}</td>
@@ -7164,11 +7161,11 @@ async function renderUsersPanel() {
         <td style="padding:10px 8px;font-size:13px;font-weight:800;color:${livesColor};">${livesLabel}</td>
         <td style="padding:10px 8px;font-size:12px;color:var(--text2);">${u.lastActive||''}</td>
         <td style="padding:10px 8px;font-size:13px;font-weight:800;color:${pctColorVal};">${pct}%</td>
-        <td style="padding:10px 8px;text-align:center;">${livesBtn}<button onclick="deleteUserFromPanel('${u.id}','${u.name.replace(/'/g,"&#39;")}')" style="background:#FF4D4D;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">🗑️ Excluir</button></td>
+        <td style="padding:10px 8px;text-align:center;"><button onclick="deleteUserFromPanel('${u.id}','${u.name.replace(/'/g,"&#39;")}')" style="background:#FF4D4D;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;cursor:pointer;">🗑️ Excluir</button></td>
       </tr>`;
     }).join('');
 
-  // Calcula usuários com vidas travadas para exibir alerta
+  // Calcula usuários com vidas travadas (apenas para diagnóstico informativo — sem opção de restaurar)
   const todayStr2 = today();
   const stuckUsers = allUsers.filter(u => {
     const hasNoLives = (u.lives !== undefined && u.lives !== null) ? u.lives <= 0 : false;
@@ -7180,17 +7177,12 @@ async function renderUsersPanel() {
     <h2 style="font-size:20px;font-weight:900;margin-bottom:4px;">👥 Relatório de Usuários</h2>
     <p style="font-size:13px;color:var(--text2);font-weight:600;margin-bottom:12px;">Nome, unidade, turno, cargo, XP, último acesso e % de conclusão do módulo HSE</p>
 
-    <!-- DIAGNÓSTICO DE VIDAS -->
-    <div style="background:${stuckUsers.length > 0 ? '#FFF0EE' : '#EAFAF1'};border-radius:14px;padding:12px 16px;margin-bottom:14px;border:2px solid ${stuckUsers.length > 0 ? '#FFCCC4' : 'var(--green)'};display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-      <div>
-        <div style="font-weight:900;font-size:13px;color:${stuckUsers.length > 0 ? 'var(--shopee-dark)' : '#1E8449'};">
-          ${stuckUsers.length > 0 ? `⚠️ ${stuckUsers.length} usuário(s) com VIDAS TRAVADAS (0 vidas, livesDate desatualizado)` : '✅ Nenhum usuário com vidas travadas'}
-        </div>
-        ${stuckUsers.length > 0 ? `<div style="font-size:11px;color:var(--shopee-dark);margin-top:2px;font-weight:600;">${stuckUsers.map(u=>u.name).join(', ')}</div>` : ''}
+    <!-- DIAGNÓSTICO DE VIDAS (somente informativo) -->
+    <div style="background:${stuckUsers.length > 0 ? '#FFF0EE' : '#EAFAF1'};border-radius:14px;padding:12px 16px;margin-bottom:14px;border:2px solid ${stuckUsers.length > 0 ? '#FFCCC4' : 'var(--green)'};">
+      <div style="font-weight:900;font-size:13px;color:${stuckUsers.length > 0 ? 'var(--shopee-dark)' : '#1E8449'};">
+        ${stuckUsers.length > 0 ? `⚠️ ${stuckUsers.length} usuário(s) com VIDAS TRAVADAS (0 vidas, livesDate desatualizado)` : '✅ Nenhum usuário com vidas travadas'}
       </div>
-      <button id="btn-diagnostic-lives" onclick="adminDiagnosticLives()" style="background:${stuckUsers.length > 0 ? 'var(--shopee)' : '#27AE60'};color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">
-        ${stuckUsers.length > 0 ? '❤️ Restaurar Vidas' : '🔍 Verificar Vidas Travadas'}
-      </button>
+      ${stuckUsers.length > 0 ? `<div style="font-size:11px;color:var(--shopee-dark);margin-top:2px;font-weight:600;">${stuckUsers.map(u=>u.name).join(', ')}</div>` : ''}
     </div>
 
     <!-- SEARCH (dispara apenas no ENTER) -->
@@ -7284,81 +7276,6 @@ async function renderUsersPanel() {
 }
 
 // ============================================================
-// DIAGNÓSTICO E CORREÇÃO DE VIDAS
-// ============================================================
-async function adminDiagnosticLives() {
-  const btn = document.getElementById('btn-diagnostic-lives');
-  if(btn) { btn.textContent = '⏳ Verificando...'; btn.disabled = true; }
-  const todayDate = today();
-  const { data: usersData } = await getDB().from('users').select('*');
-  const allUsers = (usersData || []).map(r => rowToUser(r)).filter(u => !u.isAdmin);
-
-  // Usuários com lives = 0 E livesDate != hoje OU livesDate vazio com lastActive != hoje
-  const stuck = allUsers.filter(u => {
-    const hasNoLives = (u.lives !== undefined && u.lives !== null) ? u.lives <= 0 : false;
-    const livesDateOld = !u.livesDate || u.livesDate !== todayDate;
-    const lastActiveOld = u.lastActive && u.lastActive !== todayDate;
-    // Preso: sem vidas E (livesDate é de outro dia OU está vazio mas lastActive também é de outro dia)
-    return hasNoLives && livesDateOld;
-  });
-
-  if(stuck.length === 0) {
-    showToast('✅ Nenhum usuário com vidas travadas encontrado!');
-    if(btn) { btn.textContent = '🔍 Verificar Vidas Travadas'; btn.disabled = false; }
-    return;
-  }
-
-  const names = stuck.map(u => `• ${u.name} (vidas: ${u.lives}, livesDate: "${u.livesDate||'vazio'}", lastActive: ${u.lastActive})`).join('\n');
-  const confirm1 = confirm(
-    `⚠️ ${stuck.length} usuário(s) com vidas TRAVADAS (0 vidas, livesDate desatualizado):\n\n${names}\n\nDeseja RESTAURAR as vidas de todos esses usuários agora?`
-  );
-
-  if(!confirm1) {
-    if(btn) { btn.textContent = '🔍 Verificar Vidas Travadas'; btn.disabled = false; }
-    return;
-  }
-
-  let fixed = 0;
-  for(const u of stuck) {
-    u.lives = 5;
-    u.livesDate = todayDate;
-    await saveUser(u);
-    if(state.users[u.id]) {
-      state.users[u.id].lives = 5;
-      state.users[u.id].livesDate = todayDate;
-    }
-    fixed++;
-  }
-
-  showToast(`✅ ${fixed} usuário(s) tiveram as vidas restauradas!`);
-  if(btn) { btn.textContent = '🔍 Verificar Vidas Travadas'; btn.disabled = false; }
-  await renderUsersPanel();
-}
-window.adminDiagnosticLives = adminDiagnosticLives;
-
-async function adminRestoreUserLives(userId, userName) {
-  if(!confirm(`Restaurar as vidas de ${userName} para 5 agora?`)) return;
-  const { data: row } = await getDB().from('users').select('*').eq('id', userId).single();
-  if(!row) { showToast('❌ Usuário não encontrado.'); return; }
-  const u = rowToUser(row);
-  u.lives = 5;
-  u.livesDate = today();
-  await saveUser(u);
-  if(state.users[userId]) {
-    state.users[userId].lives = 5;
-    state.users[userId].livesDate = today();
-  }
-  // Se for o usuário logado atualmente, atualiza o estado e o nav
-  if(state.currentUser && state.currentUser.id === userId) {
-    state.currentUser.lives = 5;
-    state.currentUser.livesDate = today();
-    updateNavStats();
-  }
-  showToast(`✅ Vidas de ${userName} restauradas!`);
-  await renderUsersPanel();
-}
-window.adminRestoreUserLives = adminRestoreUserLives;
-
 // Liga o listener de ENTER no campo de busca — a busca NUNCA dispara durante digitação,
 // ao perder foco (blur) ou ao clicar fora. Só dispara com a tecla Enter ou clique no botão Buscar.
 function wireUsersSearchInput() {
