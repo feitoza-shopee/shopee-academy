@@ -1105,44 +1105,45 @@ body {
     <div id="form-register" style="display:none">
       <div style="text-align:center;margin-bottom:20px;">
         <div style="font-size:13px;color:var(--text2);font-weight:700;">Preencha seus dados para criar sua conta</div>
+        <div style="font-size:11px;color:var(--text2);font-weight:600;margin-top:4px;">* Todos os campos são obrigatórios</div>
       </div>
       <div class="form-group">
-        <label>Nome Completo</label>
-        <input type="text" id="reg-name" placeholder="Seu nome completo" />
+        <label>Nome Completo *</label>
+        <input type="text" id="reg-name" placeholder="Seu nome completo" required />
       </div>
       <div class="form-group">
-        <label>Apelido <span style="font-weight:600;color:var(--text2);font-size:11px;text-transform:none;letter-spacing:0">(como prefere ser chamado)</span></label>
-        <input type="text" id="reg-nickname" placeholder="Ex: Zé, Mari, Feitoza..." maxlength="20" />
+        <label>Apelido * <span style="font-weight:600;color:var(--text2);font-size:11px;text-transform:none;letter-spacing:0">(como prefere ser chamado)</span></label>
+        <input type="text" id="reg-nickname" placeholder="Ex: Zé, Mari, Feitoza..." maxlength="20" required />
       </div>
       <div class="form-group">
-        <label>CPF</label>
-        <input type="text" id="reg-cpf" placeholder="000.000.000-00" maxlength="14" />
+        <label>CPF *</label>
+        <input type="text" id="reg-cpf" placeholder="000.000.000-00" maxlength="14" required />
       </div>
       <div class="form-group">
-        <label>Senha</label>
+        <label>Senha *</label>
         <div style="position:relative">
-          <input type="password" id="reg-pass" placeholder="Crie uma senha" style="padding-right:48px" />
+          <input type="password" id="reg-pass" placeholder="Crie uma senha" style="padding-right:48px" required />
           <button type="button" onclick="togglePass('reg-pass','eye-reg1')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:20px;line-height:1;" id="eye-reg1">👁️</button>
         </div>
       </div>
       <div class="form-group">
-        <label>Confirmar Senha</label>
+        <label>Confirmar Senha *</label>
         <div style="position:relative">
-          <input type="password" id="reg-pass2" placeholder="Repita a senha" style="padding-right:48px" />
+          <input type="password" id="reg-pass2" placeholder="Repita a senha" style="padding-right:48px" required />
           <button type="button" onclick="togglePass('reg-pass2','eye-reg2')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:20px;line-height:1;" id="eye-reg2">👁️</button>
         </div>
       </div>
       <div class="form-group">
-        <label>Unidade</label>
-        <select id="reg-unit">
+        <label>Unidade *</label>
+        <select id="reg-unit" required>
           <option value="">Selecione sua unidade</option>
           <option value="SOC-PE2">SOC-PE2</option>
           <option value="SOC-PE4">SOC-PE4</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Turno</label>
-        <select id="reg-shift">
+        <label>Turno *</label>
+        <select id="reg-shift" required>
           <option value="">Selecione seu turno</option>
           <option value="T1">T1</option>
           <option value="T2">T2</option>
@@ -1151,8 +1152,8 @@ body {
         </select>
       </div>
       <div class="form-group">
-        <label>Cargo</label>
-        <select id="reg-position">
+        <label>Cargo *</label>
+        <select id="reg-position" required>
           <option value="">Selecione seu cargo</option>
           <option value="Log I">Log I</option>
           <option value="Log II">Log II</option>
@@ -4098,8 +4099,8 @@ async function handleRegister() {
   const position = document.getElementById('reg-position').value;
   const errEl = document.getElementById('login-error');
 
-  if(!name||!cpf||!pass||!pass2||!unit||!shift||!position) {
-    errEl.textContent='Preencha todos os campos, incluindo o Cargo.';
+  if(!name||!nickname||!cpf||!pass||!pass2||!unit||!shift||!position) {
+    errEl.textContent='Preencha todos os campos, incluindo Apelido e Cargo. Todos os campos são obrigatórios.';
     errEl.classList.remove('hidden'); return;
   }
   if(!validarCPF(cpf)) {
@@ -7135,8 +7136,8 @@ async function renderUsersPanel() {
 
   const hasActiveFilter = filterDateFrom || filterDateTo || filterShift || filterUnit || filterPosition || searchQuery;
 
-  // % de conclusão do módulo HSE (sempre o primeiro módulo da trilha, mod_hse_lider)
-  const hseMod = state.modules.find(m => m.id === 'mod_hse_lider') || state.modules[0];
+  // % de perguntas acertadas no módulo "Prova — Avaliação de Conhecimentos HSE" (mod_prova)
+  const hseMod = state.modules.find(m => m.id === 'mod_prova');
   // % HSE calculado pelo peso de cada PERGUNTA, não pelo peso de cada lição.
   // Ex.: módulo com 64 perguntas no total -> cada pergunta vale 100/64 = 1,5625%.
   // Assim, lições com mais perguntas pesam proporcionalmente mais na % final.
@@ -7348,7 +7349,8 @@ function exportTodayToExcel() {
   else if(filterDateTo)   periodLabel = 'ate_' + filterDateTo;
   else                    periodLabel = today();
 
-  const hseMod = state.modules.find(m => m.id === 'mod_hse_lider') || state.modules[0];
+  // % de perguntas acertadas no módulo "Prova — Avaliação de Conhecimentos HSE" (mod_prova)
+  const hseMod = state.modules.find(m => m.id === 'mod_prova');
   // % HSE calculado pelo peso de cada PERGUNTA, não pelo peso de cada lição.
   // Ex.: módulo com 64 perguntas no total -> cada pergunta vale 100/64 = 1,5625%.
   // Assim, lições com mais perguntas pesam proporcionalmente mais na % final.
